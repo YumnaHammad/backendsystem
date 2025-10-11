@@ -50,25 +50,80 @@ const createWarehouse = async (req, res) => {
   try {
     const warehouseData = req.body;
     
+    console.log('Creating warehouse with data:', JSON.stringify(warehouseData, null, 2));
+    
+    // Validate required fields
+    if (!warehouseData.name || !warehouseData.name.trim()) {
+      return res.status(400).json({ 
+        error: 'Name is required',
+        field: 'name',
+        message: 'Please provide a warehouse name'
+      });
+    }
+    
+    if (!warehouseData.location || !warehouseData.location.trim()) {
+      return res.status(400).json({ 
+        error: 'Location is required',
+        field: 'location',
+        message: 'Please provide a warehouse location'
+      });
+    }
+    
+    if (!warehouseData.capacity || warehouseData.capacity < 1) {
+      return res.status(400).json({ 
+        error: 'Capacity is required',
+        field: 'capacity',
+        message: 'Please provide a valid warehouse capacity (minimum 1)'
+      });
+    }
+    
     const warehouse = await Warehouse.create(warehouseData);
     
-    // Create audit log
-    await createAuditLog(
-      req.user._id,
-      req.user.role,
-      'warehouse_created',
-      'Warehouse',
-      warehouse._id,
-      null,
-      warehouse.toObject(),
-      { name: warehouse.name, capacity: warehouse.capacity },
-      req
-    );
+    // Create audit log only if user is authenticated
+    if (req.user) {
+      try {
+        await createAuditLog(
+          req.user._id,
+          req.user.role,
+          'warehouse_created',
+          'Warehouse',
+          warehouse._id,
+          null,
+          warehouse.toObject(),
+          { name: warehouse.name, capacity: warehouse.capacity },
+          req
+        );
+      } catch (auditError) {
+        console.error('Audit log error (non-critical):', auditError);
+      }
+    }
 
-    res.status(201).json(warehouse);
+    res.status(201).json({
+      message: 'Warehouse created successfully',
+      warehouse
+    });
   } catch (error) {
     console.error('Create warehouse error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error details:', error.message);
+    
+    // Handle Mongoose validation errors
+    if (error.name === 'ValidationError') {
+      const validationErrors = {};
+      Object.keys(error.errors).forEach(key => {
+        validationErrors[key] = error.errors[key].message;
+      });
+      
+      return res.status(400).json({ 
+        error: 'Validation failed',
+        validationErrors,
+        message: 'Please check all required fields'
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'Failed to create warehouse',
+      details: error.message
+    });
   }
 };
 
@@ -89,23 +144,35 @@ const updateWarehouse = async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    // Create audit log
-    await createAuditLog(
-      req.user._id,
-      req.user.role,
-      'warehouse_updated',
-      'Warehouse',
-      id,
-      oldValues,
-      updatedWarehouse.toObject(),
-      { name: updatedWarehouse.name, capacity: updatedWarehouse.capacity },
-      req
-    );
+    // Create audit log only if user is authenticated
+    if (req.user) {
+      try {
+        await createAuditLog(
+          req.user._id,
+          req.user.role,
+          'warehouse_updated',
+          'Warehouse',
+          id,
+          oldValues,
+          updatedWarehouse.toObject(),
+          { name: updatedWarehouse.name, capacity: updatedWarehouse.capacity },
+          req
+        );
+      } catch (auditError) {
+        console.error('Audit log error (non-critical):', auditError);
+      }
+    }
 
-    res.json(updatedWarehouse);
+    res.json({
+      message: 'Warehouse updated successfully',
+      warehouse: updatedWarehouse
+    });
   } catch (error) {
     console.error('Update warehouse error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ 
+      error: 'Failed to update warehouse',
+      details: error.message
+    });
   }
 };
 
@@ -129,23 +196,32 @@ const deleteWarehouse = async (req, res) => {
     // Hard delete - completely remove from database
     await Warehouse.findByIdAndDelete(id);
 
-    // Create audit log
-    await createAuditLog(
-      req.user._id,
-      req.user.role,
-      'warehouse_deleted',
-      'Warehouse',
-      id,
-      warehouse.toObject(),
-      null,
-      { name: warehouse.name, totalStock },
-      req
-    );
+    // Create audit log only if user is authenticated
+    if (req.user) {
+      try {
+        await createAuditLog(
+          req.user._id,
+          req.user.role,
+          'warehouse_deleted',
+          'Warehouse',
+          id,
+          warehouse.toObject(),
+          null,
+          { name: warehouse.name, totalStock },
+          req
+        );
+      } catch (auditError) {
+        console.error('Audit log error (non-critical):', auditError);
+      }
+    }
 
     res.json({ message: 'Warehouse deleted successfully' });
   } catch (error) {
     console.error('Delete warehouse error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ 
+      error: 'Failed to delete warehouse',
+      details: error.message
+    });
   }
 };
 
@@ -183,24 +259,30 @@ const addStock = async (req, res) => {
     await warehouse.updateStock(productId, quantity, tags);
     await warehouse.save();
 
-    // Create audit log
-    await createAuditLog(
-      req.user._id,
-      req.user.role,
-      'stock_added',
-      'Warehouse',
-      id,
-      { totalStock: currentStock },
-      { totalStock: warehouse.getTotalStock() },
-      { 
-        productId,
-        productName: product.name,
-        quantity,
-        tags,
-        warehouseName: warehouse.name
-      },
-      req
-    );
+    // Create audit log only if user is authenticated
+    if (req.user) {
+      try {
+        await createAuditLog(
+          req.user._id,
+          req.user.role,
+          'stock_added',
+          'Warehouse',
+          id,
+          { totalStock: currentStock },
+          { totalStock: warehouse.getTotalStock() },
+          { 
+            productId,
+            productName: product.name,
+            quantity,
+            tags,
+            warehouseName: warehouse.name
+          },
+          req
+        );
+      } catch (auditError) {
+        console.error('Audit log error (non-critical):', auditError);
+      }
+    }
 
     // Populate the updated warehouse with product details
     await warehouse.populate('currentStock.productId', 'name sku category');
@@ -296,22 +378,28 @@ const transferStock = async (req, res) => {
     await sourceWarehouse.save();
     await targetWarehouse.save();
 
-    // Create audit log
-    await createAuditLog(
-      req.user._id,
-      req.user.role,
-      'stock_transferred',
-      'Warehouse',
-      id,
-      { sourceStock: sourceWarehouse.currentStock },
-      { targetStock: targetWarehouse.currentStock },
-      { 
-        transfers: transferDetails,
-        sourceWarehouseId: id,
-        targetWarehouseId 
-      },
-      req
-    );
+    // Create audit log only if user is authenticated
+    if (req.user) {
+      try {
+        await createAuditLog(
+          req.user._id,
+          req.user.role,
+          'stock_transferred',
+          'Warehouse',
+          id,
+          { sourceStock: sourceWarehouse.currentStock },
+          { targetStock: targetWarehouse.currentStock },
+          { 
+            transfers: transferDetails,
+            sourceWarehouseId: id,
+            targetWarehouseId 
+          },
+          req
+        );
+      } catch (auditError) {
+        console.error('Audit log error (non-critical):', auditError);
+      }
+    }
 
     res.json({ 
       message: 'Stock transferred successfully',
