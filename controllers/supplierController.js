@@ -70,12 +70,31 @@ const createSupplier = async (req, res) => {
     
     console.log('Creating supplier with data:', JSON.stringify(supplierData, null, 2));
     
+    // Validate required fields
+    if (!supplierData.name || !supplierData.name.trim()) {
+      return res.status(400).json({ 
+        error: 'Name is required',
+        field: 'name',
+        message: 'Please provide a supplier name'
+      });
+    }
+    
+    if (!supplierData.email || !supplierData.email.trim()) {
+      return res.status(400).json({ 
+        error: 'Email is required',
+        field: 'email',
+        message: 'Please provide a supplier email'
+      });
+    }
+    
     // Check if supplier with same email already exists
-    if (supplierData.email) {
-      const existingSupplier = await Supplier.findOne({ email: supplierData.email });
-      if (existingSupplier) {
-        return res.status(400).json({ error: 'Supplier with this email already exists' });
-      }
+    const existingSupplier = await Supplier.findOne({ email: supplierData.email.toLowerCase() });
+    if (existingSupplier) {
+      return res.status(400).json({ 
+        error: 'Supplier with this email already exists',
+        field: 'email',
+        message: 'A supplier with this email address is already registered'
+      });
     }
     
     const supplier = new Supplier(supplierData);
@@ -88,11 +107,24 @@ const createSupplier = async (req, res) => {
   } catch (error) {
     console.error('Error creating supplier:', error);
     console.error('Error details:', error.message);
-    console.error('Error stack:', error.stack);
+    
+    // Handle Mongoose validation errors
+    if (error.name === 'ValidationError') {
+      const validationErrors = {};
+      Object.keys(error.errors).forEach(key => {
+        validationErrors[key] = error.errors[key].message;
+      });
+      
+      return res.status(400).json({ 
+        error: 'Validation failed',
+        validationErrors,
+        message: 'Please check all required fields'
+      });
+    }
+    
     res.status(500).json({ 
       error: 'Failed to create supplier',
-      details: error.message,
-      validationErrors: error.errors
+      details: error.message
     });
   }
 };
