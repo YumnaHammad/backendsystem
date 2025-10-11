@@ -18,18 +18,18 @@ const getDashboardSummary = async (req, res) => {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    // Total Products
-    const totalProducts = await Product.countDocuments({ isActive: true });
+    // Total Products - Show ALL
+    const totalProducts = await Product.countDocuments({});
 
-    // Total Items in Stock (across all warehouses)
-    const warehouses = await Warehouse.find({ isActive: true });
+    // Total Items in Stock (across ALL warehouses)
+    const warehouses = await Warehouse.find({});
     let totalItemsInStock = 0;
     for (const warehouse of warehouses) {
       totalItemsInStock += warehouse.currentStock.reduce((sum, item) => sum + item.quantity, 0);
     }
 
-    // Total Warehouses
-    const totalWarehouses = await Warehouse.countDocuments({ isActive: true });
+    // Total Warehouses - Show ALL
+    const totalWarehouses = await Warehouse.countDocuments({});
 
     // Total Dispatched Products (today/week/month)
     const dispatchedToday = await SalesShipment.countDocuments({
@@ -97,8 +97,8 @@ const getMainDashboardReport = async (req, res) => {
   try {
     const { page = 1, limit = 50 } = req.query;
 
-    // Get all active products
-    const products = await Product.find({ isActive: true })
+    // Get ALL products
+    const products = await Product.find({})
       .sort({ name: 1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -106,8 +106,8 @@ const getMainDashboardReport = async (req, res) => {
     const report = [];
 
     for (const product of products) {
-      // Get current stock across all warehouses
-      const warehouses = await Warehouse.find({ isActive: true });
+      // Get current stock across ALL warehouses
+      const warehouses = await Warehouse.find({});
       let currentStock = 0;
       const warehouseStock = [];
 
@@ -198,7 +198,7 @@ const getMainDashboardReport = async (req, res) => {
       return a.daysOfInventory - b.daysOfInventory;
     });
 
-    const total = await Product.countDocuments({ isActive: true });
+    const total = await Product.countDocuments({});
 
     res.json({
       report,
@@ -225,7 +225,7 @@ const getDailyStockReport = async (req, res) => {
     const { date } = req.query;
     const reportDate = date ? new Date(date) : new Date();
 
-    const warehouses = await Warehouse.find({ isActive: true });
+    const warehouses = await Warehouse.find({});
     const report = [];
 
     for (const warehouse of warehouses) {
@@ -471,7 +471,7 @@ const getMonthlyInventoryReport = async (req, res) => {
 
 // Helper function to get stock snapshot at a specific date
 const getStockSnapshot = async (date) => {
-  const warehouses = await Warehouse.find({ isActive: true });
+  const warehouses = await Warehouse.find({});
   const stockSnapshot = {};
 
   for (const warehouse of warehouses) {
@@ -516,14 +516,13 @@ const getSupplierPerformanceReport = async (req, res) => {
       if (endDate) dateFilter.purchaseDate.$lte = new Date(endDate);
     }
 
-    const suppliers = await Supplier.find({ isActive: true });
+    const suppliers = await Supplier.find({});
     const report = [];
 
     for (const supplier of suppliers) {
       const purchases = await Purchase.find({
         supplierId: supplier._id,
-        ...dateFilter,
-        isActive: true
+        ...dateFilter
       });
 
       const totalPurchases = purchases.length;
@@ -601,7 +600,7 @@ const getReturnAnalysisReport = async (req, res) => {
       if (endDate) dateFilter.returnDate.$lte = new Date(endDate);
     }
 
-    const returns = await Return.find({ ...dateFilter, isActive: true })
+    const returns = await Return.find({ ...dateFilter })
       .populate('salesOrderId', 'orderNumber customerInfo')
       .populate('items.productId', 'name sku')
       .populate('items.warehouseId', 'name location');

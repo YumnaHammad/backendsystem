@@ -18,17 +18,15 @@ const getDashboardSummary = async (req, res) => {
     const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    // 1. BASIC COUNTS
-    const totalProducts = await Product.countDocuments({ isActive: true });
-    const totalWarehouses = await Warehouse.countDocuments({ isActive: true });
-    const totalUsers = await User.countDocuments({ isActive: true });
-    const totalSuppliers = await Supplier.countDocuments({ isActive: true });
-    const totalCustomers = await Customer.countDocuments({ isActive: true });
+    // 1. BASIC COUNTS - Show ALL data
+    const totalProducts = await Product.countDocuments({});
+    const totalWarehouses = await Warehouse.countDocuments({});
+    const totalUsers = await User.countDocuments({});
+    const totalSuppliers = await Supplier.countDocuments({});
+    const totalCustomers = await Customer.countDocuments({});
 
-    // Calculate online users (active users - simplified approach)
-    const onlineUsers = await User.countDocuments({
-      isActive: true
-    });
+    // Calculate online users (all users - simplified approach)
+    const onlineUsers = await User.countDocuments({});
 
     // Calculate active orders (orders created in last 7 days)
     const activeOrders = await SalesOrder.countDocuments({
@@ -39,15 +37,15 @@ const getDashboardSummary = async (req, res) => {
     // Calculate critical alerts (low stock + out of stock)
     const criticalAlerts = lowStockItems + outOfStockItems;
 
-    // 2. CALCULATE TOTAL STOCK VALUE
-    const products = await Product.find({ isActive: true });
+    // 2. CALCULATE TOTAL STOCK VALUE - Include ALL products
+    const products = await Product.find({});
     let totalStockValue = 0;
     let totalItemsInStock = 0;
     let lowStockItems = 0;
     let outOfStockItems = 0;
 
-    // Get stock from warehouses
-    const warehouses = await Warehouse.find({ isActive: true });
+    // Get stock from ALL warehouses
+    const warehouses = await Warehouse.find({});
     
     for (const product of products) {
       let productStock = 0;
@@ -234,8 +232,8 @@ const getModuleAnalytics = async (req, res) => {
 
     switch (module) {
       case 'products':
-        const products = await Product.find({ isActive: true });
-        const warehouses = await Warehouse.find({ isActive: true });
+        const products = await Product.find({});
+        const warehouses = await Warehouse.find({});
         
         const productAnalytics = {
           totalProducts: products.length,
