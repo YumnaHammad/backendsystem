@@ -54,4 +54,27 @@ router.get('/login', (req, res) => {
 router.post('/login', login);       // POST http://localhost:5000/api/auth/login
 router.get('/profile', authenticateToken, getProfile); // GET profile
 
+// GET /users - Public endpoint to view all registered users (for testing)
+router.get('/users', async (req, res) => {
+  try {
+    const User = require('../models/User');
+    const users = await User.find().select('-password').sort({ createdAt: -1 });
+    res.json({ 
+      count: users.length,
+      users: users.map(u => ({
+        id: u._id,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        email: u.email,
+        role: u.role,
+        isActive: u.isActive,
+        createdAt: u.createdAt
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
 module.exports = router;
