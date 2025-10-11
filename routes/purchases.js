@@ -13,6 +13,15 @@ const {
 
 const router = express.Router();
 
+// Health check for purchases endpoint
+router.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    message: 'Purchases endpoint is working',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Public routes (no auth required for testing)
 router.get('/', getAllPurchases);
 router.get('/:id', getPurchaseById);
