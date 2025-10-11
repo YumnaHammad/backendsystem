@@ -3,7 +3,11 @@ const { createAuditLog } = require('../middleware/audit');
 
 const getAllWarehouses = async (req, res) => {
   try {
-    const warehouses = await Warehouse.find({ isActive: true })
+    // Allow filtering by isActive status via query parameter
+    const { isActive } = req.query;
+    const query = isActive !== undefined ? { isActive: isActive === 'true' } : {};
+    
+    const warehouses = await Warehouse.find(query)
       .populate('currentStock.productId', 'name sku')
       .sort({ createdAt: -1 });
 
