@@ -1,16 +1,15 @@
 {
   "version": 2,
-  "name": "inventory-system-backend",
-  "rewrites": [
+  "builds": [
     {
-      "source": "/(.*)",
-      "destination": "/api/index"
+      "src": "api/index.js",
+      "use": "@vercel/node"
     }
   ],
-  "functions": {
-    "api/index.js": {
-      "maxDuration": 30,
-      "memory": 1024
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "api/index.js"
     }
-  }
+  ]
 }
