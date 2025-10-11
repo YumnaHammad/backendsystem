@@ -6,12 +6,30 @@ const createPurchase = async (req, res) => {
   try {
     const { supplierId, items, expectedDeliveryDate, notes, paymentMethod } = req.body;
 
-    console.log('Creating purchase...', { supplierId, itemsCount: items?.length });
+    console.log('Creating purchase - Full request body:', JSON.stringify(req.body, null, 2));
+
+    // Validate required fields
+    if (!supplierId) {
+      return res.status(400).json({ 
+        error: 'Supplier ID is required',
+        field: 'supplierId' 
+      });
+    }
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ 
+        error: 'At least one purchase item is required',
+        field: 'items' 
+      });
+    }
 
     // Validate supplier
     const supplier = await Supplier.findById(supplierId);
     if (!supplier) {
-      return res.status(404).json({ error: 'Supplier not found' });
+      return res.status(404).json({ 
+        error: 'Supplier not found',
+        supplierId 
+      });
     }
 
     // Validate products and calculate totals
@@ -19,9 +37,34 @@ const createPurchase = async (req, res) => {
     const validatedItems = [];
 
     for (const item of items) {
+      // Validate item fields
+      if (!item.productId) {
+        return res.status(400).json({ 
+          error: 'Product ID is required for each item',
+          field: 'productId' 
+        });
+      }
+      
+      if (!item.quantity || item.quantity <= 0) {
+        return res.status(400).json({ 
+          error: 'Valid quantity is required for each item',
+          field: 'quantity' 
+        });
+      }
+      
+      if (!item.unitPrice || item.unitPrice <= 0) {
+        return res.status(400).json({ 
+          error: 'Valid unit price is required for each item',
+          field: 'unitPrice' 
+        });
+      }
+
       const product = await Product.findById(item.productId);
       if (!product) {
-        return res.status(404).json({ error: `Product with ID ${item.productId} not found` });
+        return res.status(404).json({ 
+          error: `Product with ID ${item.productId} not found`,
+          productId: item.productId 
+        });
       }
 
       const itemTotal = item.quantity * item.unitPrice;
@@ -132,7 +175,13 @@ const createPurchase = async (req, res) => {
 
   } catch (error) {
     console.error('Create purchase error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error details:', error.message);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Failed to create purchase',
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 };
 
