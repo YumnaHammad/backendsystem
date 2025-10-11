@@ -68,10 +68,14 @@ const createSupplier = async (req, res) => {
   try {
     const supplierData = req.body;
     
+    console.log('Creating supplier with data:', JSON.stringify(supplierData, null, 2));
+    
     // Check if supplier with same email already exists
-    const existingSupplier = await Supplier.findOne({ email: supplierData.email });
-    if (existingSupplier) {
-      return res.status(400).json({ error: 'Supplier with this email already exists' });
+    if (supplierData.email) {
+      const existingSupplier = await Supplier.findOne({ email: supplierData.email });
+      if (existingSupplier) {
+        return res.status(400).json({ error: 'Supplier with this email already exists' });
+      }
     }
     
     const supplier = new Supplier(supplierData);
@@ -83,7 +87,13 @@ const createSupplier = async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating supplier:', error);
-    res.status(500).json({ error: 'Failed to create supplier' });
+    console.error('Error details:', error.message);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Failed to create supplier',
+      details: error.message,
+      validationErrors: error.errors
+    });
   }
 };
 
