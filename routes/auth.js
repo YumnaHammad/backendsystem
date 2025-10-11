@@ -4,7 +4,53 @@ const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
+// GET /register - Returns API documentation for the register endpoint
+router.get('/register', (req, res) => {
+  res.json({
+    endpoint: '/api/auth/register',
+    method: 'POST',
+    description: 'Register a new user account',
+    contentType: 'application/json',
+    requiredFields: {
+      firstName: 'string (required)',
+      lastName: 'string (required)',
+      email: 'string (required)',
+      password: 'string (required)',
+      role: 'string (optional, default: "employee")'
+    },
+    example: {
+      firstName: 'John',
+      lastName: 'Doe',
+      email: 'john.doe@example.com',
+      password: 'SecurePassword123',
+      role: 'employee'
+    },
+    possibleRoles: ['admin', 'manager', 'employee'],
+    note: 'Please use POST method to register. GET method is for documentation only.'
+  });
+});
+
 router.post('/register', register); // POST http://localhost:5000/api/auth/register
+
+// GET /login - Returns API documentation for the login endpoint
+router.get('/login', (req, res) => {
+  res.json({
+    endpoint: '/api/auth/login',
+    method: 'POST',
+    description: 'Login to get authentication token',
+    contentType: 'application/json',
+    requiredFields: {
+      email: 'string (required)',
+      password: 'string (required)'
+    },
+    example: {
+      email: 'john.doe@example.com',
+      password: 'SecurePassword123'
+    },
+    note: 'Please use POST method to login. GET method is for documentation only.'
+  });
+});
+
 router.post('/login', login);       // POST http://localhost:5000/api/auth/login
 router.get('/profile', authenticateToken, getProfile); // GET profile
 
