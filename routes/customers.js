@@ -8,9 +8,13 @@ const router = express.Router();
 // Get all customers
 const getAllCustomers = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search } = req.query;
+    const { page = 1, limit = 10, search, isActive } = req.query;
     
-    let query = { isActive: true };
+    // Show all customers by default, allow filtering by isActive
+    let query = {};
+    if (isActive !== undefined) {
+      query.isActive = isActive === 'true';
+    }
     
     if (search) {
       query.$or = [

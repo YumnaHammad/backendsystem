@@ -145,9 +145,13 @@ const createPurchase = async (req, res) => {
 // Get all purchases
 const getAllPurchases = async (req, res) => {
   try {
-    const { page = 1, limit = 10, status, supplierId, startDate, endDate } = req.query;
+    const { page = 1, limit = 10, status, supplierId, startDate, endDate, isActive } = req.query;
     
-    let query = { isActive: true };
+    // Show all purchases by default, allow filtering by isActive
+    let query = {};
+    if (isActive !== undefined) {
+      query.isActive = isActive === 'true';
+    }
     
     if (status) query.status = status;
     if (supplierId) query.supplierId = supplierId;

@@ -88,9 +88,13 @@ const createReturn = async (req, res) => {
 // Get all returns
 const getAllReturns = async (req, res) => {
   try {
-    const { page = 1, limit = 10, status, startDate, endDate } = req.query;
+    const { page = 1, limit = 10, status, startDate, endDate, isActive } = req.query;
     
-    let query = { isActive: true };
+    // Show all returns by default, allow filtering by isActive
+    let query = {};
+    if (isActive !== undefined) {
+      query.isActive = isActive === 'true';
+    }
     
     if (status) query.status = status;
     if (startDate || endDate) {

@@ -6,7 +6,8 @@ const getStockAlerts = async (req, res) => {
   try {
     const { daysThreshold = 30 } = req.query;
 
-    const products = await Product.find({ isActive: true });
+    // Show alerts for all products, not just active ones
+    const products = await Product.find({});
 
     const alerts = [];
 
@@ -25,7 +26,7 @@ const getStockAlerts = async (req, res) => {
       const dailySalesRate = totalSold / 90; // Average over 90 days
 
       // Get current stock across all warehouses
-      const warehouses = await Warehouse.find({ isActive: true });
+      const warehouses = await Warehouse.find({});
       let totalCurrentStock = 0;
 
       for (const warehouse of warehouses) {
@@ -129,7 +130,8 @@ const getCurrentStockLevels = async (req, res) => {
   try {
     const { productId, warehouseId } = req.query;
 
-    let query = { isActive: true };
+    // Show all warehouses, not just active ones
+    let query = {};
     if (warehouseId) query._id = warehouseId;
 
     const warehouses = await Warehouse.find(query);

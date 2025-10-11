@@ -57,9 +57,13 @@ const generateUniqueSKU = async (productName) => {
 
 const getAllProducts = async (req, res) => {
   try {
-    const { category, search, page = 1, limit } = req.query;
+    const { category, search, page = 1, limit, isActive } = req.query;
     
-    let query = { isActive: true };
+    // Show all products by default, allow filtering by isActive
+    let query = {};
+    if (isActive !== undefined) {
+      query.isActive = isActive === 'true';
+    }
     
     if (category) {
       query.category = new RegExp(category, 'i');
