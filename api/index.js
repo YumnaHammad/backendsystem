@@ -32,31 +32,41 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// MongoDB connection middleware
+// Health check (no DB required)
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// MongoDB connection middleware (connect before routes)
 app.use(async (req, res, next) => {
   try {
     await connectToMongoDB();
     next();
   } catch (error) {
-    res.status(500).json({ error: 'Database connection failed' });
+    console.error('MongoDB connection failed:', error);
+    res.status(500).json({ 
+      error: 'Database connection failed',
+      message: 'Please ensure MONGODB_URI is set in environment variables'
+    });
   }
-});
-
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
 let isConnected = false;
 async function connectToMongoDB() {
   if (isConnected) return;
+  
+  const mongoURI = process.env.MONGODB_URI;
+  if (!mongoURI) {
+    throw new Error('MONGODB_URI environment variable is not set');
+  }
+  
   try {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/inventory_system', {
+    await mongoose.connect(mongoURI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
     isConnected = true;
-    console.log('Connected to MongoDB');
+    console.log('Connected to MongoDB successfully');
   } catch (error) {
     console.error('MongoDB connection error:', error);
     isConnected = false;
