@@ -27,8 +27,12 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
-    ? false // Same origin in production (backend serves frontend)
-    : ['http://localhost:3002', 'http://localhost:3001'],
+    ? [
+        'https://inventory-system-beta-smoky.vercel.app',  // Your Vercel frontend
+        'https://inventory-system-beta-smoky.vercel.app/', // With trailing slash
+        process.env.FRONTEND_URL // Allow custom frontend URL from env
+      ].filter(Boolean)
+    : ['http://localhost:3002', 'http://localhost:3001', 'http://localhost:5173'],
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
