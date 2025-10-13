@@ -12,7 +12,8 @@
     "cleanup": "node scripts/cleanup-inactive-data.js",
     "cleanup:advanced": "node scripts/advanced-cleanup.js",
     "verify": "node scripts/verify-database.js",
-    "test": "jest"
+    "test": "jest",
+    "test:add-stock": "node tests/test-add-stock.js"
   },
   "dependencies": {
     "axios": "^1.12.2",

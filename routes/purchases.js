@@ -10,6 +10,7 @@ const {
   downloadDocument,
   deletePurchase 
 } = require('../controllers/purchaseController');
+const { authenticate, optionalAuthenticate } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -22,15 +23,15 @@ router.get('/health', (req, res) => {
   });
 });
 
-// Public routes (no auth required for testing)
-router.get('/', getAllPurchases);
-router.get('/:id', getPurchaseById);
-router.post('/', createPurchase);
-router.put('/:id/status', updatePurchaseStatus);
-router.post('/:id/receipt', generateReceipt);
-router.post('/:id/invoice', generateInvoice);
-router.post('/:id/clear-payment', markPaymentCleared);
-router.get('/:id/download', downloadDocument);
-router.delete('/:id', deletePurchase);
+// Routes with optional authentication (will work with or without login)
+router.get('/', optionalAuthenticate, getAllPurchases);
+router.get('/:id', optionalAuthenticate, getPurchaseById);
+router.post('/', optionalAuthenticate, createPurchase);
+router.put('/:id/status', optionalAuthenticate, updatePurchaseStatus);
+router.post('/:id/receipt', optionalAuthenticate, generateReceipt);
+router.post('/:id/invoice', optionalAuthenticate, generateInvoice);
+router.post('/:id/clear-payment', optionalAuthenticate, markPaymentCleared);
+router.get('/:id/download', optionalAuthenticate, downloadDocument);
+router.delete('/:id', optionalAuthenticate, deletePurchase);
 
 module.exports = router;

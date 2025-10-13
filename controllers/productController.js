@@ -321,18 +321,20 @@ const deleteProduct = async (req, res) => {
     // Hard delete - completely remove from database
     await Product.findByIdAndDelete(id);
 
-    // Create audit log
-    await createAuditLog(
-      req.user._id,
-      req.user.role,
-      'product_deleted',
-      'Product',
-      id,
-      product.toObject(),
-      null,
-      { sku: product.sku, name: product.name },
-      req
-    );
+    // Create audit log (only if user is authenticated)
+    if (req.user) {
+      await createAuditLog(
+        req.user._id,
+        req.user.role,
+        'product_deleted',
+        'Product',
+        id,
+        product.toObject(),
+        null,
+        { sku: product.sku, name: product.name },
+        req
+      );
+    }
 
     res.json({ message: 'Product deleted successfully' });
   } catch (error) {

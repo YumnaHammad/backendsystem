@@ -30,6 +30,33 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
+// Optional authentication - doesn't fail if no token, but attaches user if valid token exists
+const optionalAuthenticate = async (req, res, next) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+        const user = await User.findById(decoded.userId).select('-password');
+        
+        if (user && user.isActive) {
+          req.user = user;
+        }
+      } catch (tokenError) {
+        // Ignore token errors for optional authentication
+        console.log('Optional auth: Invalid token, continuing without user');
+      }
+    }
+    
+    next();
+  } catch (error) {
+    // Continue even if there's an error
+    next();
+  }
+};
+
 const requireAdmin = (req, res, next) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin access required' });
@@ -46,6 +73,8 @@ const requireManagerOrAdmin = (req, res, next) => {
 
 module.exports = {
   authenticateToken,
+  authenticate: authenticateToken,
+  optionalAuthenticate,
   requireAdmin,
   requireManagerOrAdmin
 };

@@ -31,6 +31,14 @@ const salesOrderSchema = new mongoose.Schema({
       ref: 'Product',
       required: true
     },
+    variantId: {
+      type: String,
+      trim: true
+    },
+    variantName: {
+      type: String,
+      trim: true
+    },
     quantity: {
       type: Number,
       required: true,
@@ -58,7 +66,7 @@ const salesOrderSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'confirmed', 'dispatched', 'delivered', 'cancelled'],
+    enum: ['pending', 'confirmed', 'dispatch', 'dispatched', 'expected', 'delivered', 'return', 'returned', 'cancelled'],
     default: 'pending'
   },
   paymentStatus: {
@@ -85,7 +93,7 @@ const salesOrderSchema = new mongoose.Schema({
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: false
   },
   isActive: {
     type: Boolean,

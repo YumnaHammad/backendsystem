@@ -8,16 +8,18 @@ const {
   markDeliveryCompleted,
   deleteSalesOrder 
 } = require('../controllers/salesController');
+const { optionalAuthenticate } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Public routes (no auth required for testing)
-router.get('/', getAllSalesOrders);
-router.get('/:id', getSalesOrderById);
-router.post('/', createSalesOrder);
-router.put('/:id/status', updateSalesOrderStatus);
-router.post('/:id/dispatch', dispatchSalesOrder);
-router.post('/:id/deliver', markDeliveryCompleted);
-router.delete('/:id', deleteSalesOrder);
+// Routes with optional authentication
+router.get('/', optionalAuthenticate, getAllSalesOrders);
+router.get('/:id', optionalAuthenticate, getSalesOrderById);
+router.post('/', optionalAuthenticate, createSalesOrder);
+router.put('/:id/status', optionalAuthenticate, updateSalesOrderStatus);
+router.patch('/:id/status', optionalAuthenticate, updateSalesOrderStatus);
+router.post('/:id/dispatch', optionalAuthenticate, dispatchSalesOrder);
+router.post('/:id/deliver', optionalAuthenticate, markDeliveryCompleted);
+router.delete('/:id', optionalAuthenticate, deleteSalesOrder);
 
 module.exports = router;

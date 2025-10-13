@@ -6,9 +6,16 @@ const createSalesOrder = async (req, res) => {
   try {
     const { customerInfo, items, deliveryAddress, expectedDeliveryDate, notes } = req.body;
 
-    // Check if user is authenticated
-    if (!req.user || !req.user._id) {
-      return res.status(401).json({ error: 'User not authenticated' });
+    // User authentication is optional - use system user if not authenticated
+    let userId = req.user?._id || null;
+    
+    // If no user, try to find a default admin user
+    if (!userId) {
+      const User = require('../models/User');
+      const adminUser = await User.findOne({ role: 'admin', isActive: true });
+      if (adminUser) {
+        userId = adminUser._id;
+      }
     }
 
     // Validate products and check stock availability
@@ -20,6 +27,15 @@ const createSalesOrder = async (req, res) => {
       const product = await Product.findById(item.productId);
       if (!product) {
         return res.status(404).json({ error: `Product with ID ${item.productId} not found` });
+      }
+
+      // Get variant info if provided
+      let variantName = null;
+      if (item.variantId && product.hasVariants && product.variants) {
+        const variant = product.variants.find(v => (v._id?.toString() === item.variantId || v.sku === item.variantId));
+        if (variant) {
+          variantName = variant.name;
+        }
       }
 
       // Check stock availability across all warehouses
@@ -37,7 +53,7 @@ const createSalesOrder = async (req, res) => {
       
       if (totalAvailableStock < item.quantity) {
         return res.status(400).json({ 
-          error: `Insufficient stock for product ${product.name}. Available: ${totalAvailableStock}, Required: ${item.quantity}` 
+          error: `Insufficient stock for product ${product.name}${variantName ? ` (${variantName})` : ''}. Available: ${totalAvailableStock}, Required: ${item.quantity}` 
         });
       }
 
@@ -46,6 +62,8 @@ const createSalesOrder = async (req, res) => {
 
       validatedItems.push({
         productId: item.productId,
+        variantId: item.variantId || null,
+        variantName: variantName,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         totalPrice: itemTotal
@@ -53,6 +71,8 @@ const createSalesOrder = async (req, res) => {
 
       stockChecks.push({
         productId: item.productId,
+        variantId: item.variantId || null,
+        variantName: variantName,
         availableStock: totalAvailableStock,
         requiredStock: item.quantity
       });
@@ -71,22 +91,24 @@ const createSalesOrder = async (req, res) => {
       deliveryAddress,
       expectedDeliveryDate,
       notes,
-      createdBy: req.user._id
+      createdBy: userId
     });
 
     await salesOrder.save();
     
-    // Create audit log
-    await createAuditLog(
-      req.user._id,
-      req.user.role,
-      'sales_order_created',
-      'SalesOrder',
-      salesOrder._id,
-      null,
-      { orderNumber: salesOrder.orderNumber, totalAmount, customerName: customerInfo.name },
-      req
-    );
+    // Create audit log (only if user is authenticated)
+    if (req.user && userId) {
+      await createAuditLog(
+        userId,
+        req.user.role || 'admin',
+        'sales_order_created',
+        'SalesOrder',
+        salesOrder._id,
+        null,
+        { orderNumber: salesOrder.orderNumber, totalAmount, customerName: customerInfo.name },
+        req
+      );
+    }
 
     // Populate items for response
     await salesOrder.populate([
@@ -173,38 +195,128 @@ const updateSalesOrderStatus = async (req, res) => {
     const { id } = req.params;
     const { status, notes } = req.body;
 
-    const salesOrder = await SalesOrder.findById(id);
+    console.log('Status update request:', { id, status, notes });
+
+    const salesOrder = await SalesOrder.findById(id).populate('items.productId');
     if (!salesOrder) {
+      console.error('Sales order not found:', id);
       return res.status(404).json({ error: 'Sales order not found' });
     }
 
+    console.log('Current order status:', salesOrder.status);
+    console.log('Attempting to change to:', status);
+
     const oldStatus = salesOrder.status;
+    
+    // Handle return status - restore stock to warehouse
+    if (status === 'return' || status === 'returned') {
+      console.log('Processing return - restoring stock to warehouse');
+      
+      // Find an active warehouse to return stock to (prefer first warehouse)
+      const warehouses = await Warehouse.find({ isActive: true });
+      if (warehouses.length === 0) {
+        return res.status(400).json({ error: 'No active warehouse found to return stock' });
+      }
+      
+      const warehouse = warehouses[0]; // Use first available warehouse
+      console.log('Returning stock to warehouse:', warehouse.name);
+      
+      // Process each item and return to stock
+      for (const item of salesOrder.items) {
+        const product = item.productId;
+        const quantity = item.quantity;
+        
+        console.log(`Returning ${quantity} units of ${product.name} to stock`);
+        
+        // Find or create stock entry for this product
+        let stockItem = warehouse.currentStock.find(stock => 
+          stock.productId.toString() === product._id.toString()
+        );
+        
+        const previousQuantity = stockItem ? stockItem.quantity : 0;
+        
+            if (stockItem) {
+              stockItem.quantity += quantity;
+              // Add 'returned' tag if not already present
+              if (!stockItem.tags) {
+                stockItem.tags = [];
+              }
+              if (!stockItem.tags.includes('returned')) {
+                stockItem.tags.push('returned');
+              }
+            } else {
+              warehouse.currentStock.push({
+                productId: product._id,
+                quantity: quantity,
+                reservedQuantity: 0,
+                tags: ['returned']
+              });
+              stockItem = warehouse.currentStock[warehouse.currentStock.length - 1];
+            }
+        
+        // Create stock movement record
+        const stockMovement = new StockMovement({
+          productId: product._id,
+          warehouseId: warehouse._id,
+          movementType: 'in',
+          quantity: quantity,
+          previousQuantity: previousQuantity,
+          newQuantity: stockItem.quantity,
+          referenceType: 'return',
+          referenceId: salesOrder._id,
+          notes: `Returned from sales order ${salesOrder.orderNumber}`,
+          createdBy: req.user?._id || salesOrder.createdBy
+        });
+        
+        await stockMovement.save();
+        console.log(`Stock movement created: ${quantity} units added`);
+      }
+      
+      await warehouse.save();
+      console.log('Warehouse stock updated successfully');
+    }
+    
     salesOrder.status = status;
     if (notes) salesOrder.notes = notes;
 
     await salesOrder.save();
 
-    // Create audit log
-    await createAuditLog(
-      req.user._id,
-      req.user.role,
-      'sales_order_status_updated',
-      'SalesOrder',
-      salesOrder._id,
-      { status: oldStatus },
-      { status: salesOrder.status },
-      { orderNumber: salesOrder.orderNumber },
-      req
-    );
+    console.log('Status updated successfully to:', salesOrder.status);
 
-    res.json({
-      message: 'Sales order status updated successfully',
-      salesOrder
-    });
+    // Create audit log (only if user is authenticated)
+    if (req.user) {
+      await createAuditLog(
+        req.user._id,
+        req.user.role,
+        'sales_order_status_updated',
+        'SalesOrder',
+        salesOrder._id,
+        { status: oldStatus },
+        { status: salesOrder.status },
+        { orderNumber: salesOrder.orderNumber },
+        req
+      );
+    }
+
+        res.json({
+          message: status === 'return' || status === 'returned' 
+            ? 'Order marked as returned and stock restored to warehouse'
+            : 'Sales order status updated successfully',
+          salesOrder,
+          stockRestored: status === 'return' || status === 'returned',
+          warehouseName: (status === 'return' || status === 'returned') ? warehouse.name : null
+        });
 
   } catch (error) {
     console.error('Update sales order status error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    
+    // Send more detailed error info
+    res.status(500).json({ 
+      error: error.message || 'Internal server error',
+      details: error.name 
+    });
   }
 };
 
@@ -244,6 +356,9 @@ const dispatchSalesOrder = async (req, res) => {
       stockItem.reservedQuantity += orderItem.quantity;
     }
 
+    // Get user ID
+    let userId = req.user?._id || salesOrder.createdBy;
+
     // Create shipment
     const shipment = new SalesShipment({
       salesOrderId: salesOrder._id,
@@ -256,7 +371,7 @@ const dispatchSalesOrder = async (req, res) => {
       carrier,
       expectedDeliveryDate,
       deliveryAddress: salesOrder.deliveryAddress,
-      createdBy: req.user._id
+      createdBy: userId
     });
 
     await shipment.save();
@@ -268,18 +383,20 @@ const dispatchSalesOrder = async (req, res) => {
     // Save warehouse with reserved stock
     await warehouse.save();
 
-    // Create audit log
-    await createAuditLog(
-      req.user._id,
-      req.user.role,
-      'sales_order_dispatched',
-      'SalesOrder',
-      salesOrder._id,
-      { status: 'confirmed' },
-      { status: 'dispatched' },
-      { orderNumber: salesOrder.orderNumber, shipmentNumber: shipment.shipmentNumber },
-      req
-    );
+    // Create audit log (only if user is authenticated)
+    if (req.user) {
+      await createAuditLog(
+        req.user._id,
+        req.user.role,
+        'sales_order_dispatched',
+        'SalesOrder',
+        salesOrder._id,
+        { status: 'confirmed' },
+        { status: 'dispatched' },
+        { orderNumber: salesOrder.orderNumber, shipmentNumber: shipment.shipmentNumber },
+        req
+      );
+    }
 
     res.json({
       message: 'Sales order dispatched successfully',
@@ -338,7 +455,7 @@ const markDeliveryCompleted = async (req, res) => {
             referenceType: 'sales',
             referenceId: salesOrder._id,
             notes: `Delivered for sales order ${salesOrder.orderNumber}`,
-            createdBy: req.user._id
+            createdBy: req.user?._id || salesOrder.createdBy
           });
 
           await stockMovement.save();
@@ -357,18 +474,20 @@ const markDeliveryCompleted = async (req, res) => {
     await salesOrder.save();
     await shipment.save();
 
-    // Create audit log
-    await createAuditLog(
-      req.user._id,
-      req.user.role,
-      'sales_order_delivered',
-      'SalesOrder',
-      salesOrder._id,
-      { status: 'dispatched' },
-      { status: 'delivered' },
-      { orderNumber: salesOrder.orderNumber },
-      req
-    );
+    // Create audit log (only if user is authenticated)
+    if (req.user) {
+      await createAuditLog(
+        req.user._id,
+        req.user.role,
+        'sales_order_delivered',
+        'SalesOrder',
+        salesOrder._id,
+        { status: 'dispatched' },
+        { status: 'delivered' },
+        { orderNumber: salesOrder.orderNumber },
+        req
+      );
+    }
 
     res.json({
       message: 'Delivery marked as completed successfully',
@@ -401,18 +520,20 @@ const deleteSalesOrder = async (req, res) => {
     // Hard delete
     await SalesOrder.findByIdAndDelete(id);
 
-    // Create audit log
-    await createAuditLog(
-      req.user._id,
-      req.user.role,
-      'sales_order_deleted',
-      'SalesOrder',
-      id,
-      salesOrder.toObject(),
-      null,
-      { orderNumber: salesOrder.orderNumber },
-      req
-    );
+    // Create audit log (only if user is authenticated)
+    if (req.user) {
+      await createAuditLog(
+        req.user._id,
+        req.user.role,
+        'sales_order_deleted',
+        'SalesOrder',
+        id,
+        salesOrder.toObject(),
+        null,
+        { orderNumber: salesOrder.orderNumber },
+        req
+      );
+    }
 
     res.json({ message: 'Sales order deleted successfully' });
 

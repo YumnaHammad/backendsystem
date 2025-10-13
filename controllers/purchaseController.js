@@ -101,6 +101,19 @@ const createPurchase = async (req, res) => {
       }
     } while (attempts < maxAttempts);
 
+    // Validate user authentication - Purchase requires a logged-in user
+    if (!req.user || !req.user._id) {
+      console.error('Purchase creation failed: User not authenticated');
+      console.error('req.user:', req.user);
+      return res.status(401).json({ 
+        error: 'Authentication required. Please log in to create purchases.',
+        field: 'authentication',
+        details: 'You must be logged in to create purchase orders'
+      });
+    }
+
+    console.log('Creating purchase with user:', req.user._id);
+
     // Create purchase
     const purchase = new Purchase({
       purchaseNumber,
@@ -110,7 +123,7 @@ const createPurchase = async (req, res) => {
       expectedDeliveryDate,
       notes,
       paymentMethod,
-      createdBy: req.user ? req.user._id : null
+      createdBy: req.user._id
     });
 
     await purchase.save();
