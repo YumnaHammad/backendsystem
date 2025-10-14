@@ -8,18 +8,51 @@ const getAllWarehouses = async (req, res) => {
     const query = isActive !== undefined ? { isActive: isActive === 'true' } : {};
     
     const warehouses = await Warehouse.find(query)
-      .populate('currentStock.productId', 'name sku sellingPrice hasVariants variants')
+      .populate('currentStock.productId', 'name sku category sellingPrice hasVariants variants')
       .sort({ createdAt: -1 });
 
-    const warehousesWithStats = warehouses.map(warehouse => ({
-      ...warehouse.toObject(),
-      totalStock: warehouse.getTotalStock(),
-      capacityUsage: warehouse.getCapacityUsage(),
-      productCount: warehouse.currentStock.length
-    }));
+    const warehousesWithStats = warehouses.map(warehouse => {
+      // Enrich stock items with variant details
+      const enrichedStock = warehouse.currentStock.map(stockItem => {
+        const stockObj = stockItem.toObject ? stockItem.toObject() : stockItem;
+        const product = stockObj.productId;
+        
+        // If product has variants and this stock item has a variantId, find the variant details
+        if (product && product.hasVariants && product.variants && stockObj.variantId) {
+          const variant = product.variants.find(v => 
+            (v._id && v._id.toString() === stockObj.variantId) || 
+            (v.sku === stockObj.variantId) ||
+            (v.sku && stockObj.variantId && v.sku.toString() === stockObj.variantId.toString())
+          );
+          
+          if (variant) {
+            return {
+              ...stockObj,
+              variantDetails: {
+                name: variant.name,
+                sku: variant.sku,
+                sellingPrice: variant.sellingPrice,
+                attributes: variant.attributes
+              }
+            };
+          }
+        }
+        
+        return stockObj;
+      });
+
+      return {
+        ...warehouse.toObject(),
+        currentStock: enrichedStock,
+        totalStock: warehouse.getTotalStock(),
+        capacityUsage: warehouse.getCapacityUsage(),
+        productCount: warehouse.currentStock.length
+      };
+    });
 
     res.json(warehousesWithStats);
   } catch (error) {
+    console.error('Get warehouses error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -29,14 +62,44 @@ const getWarehouseById = async (req, res) => {
     const { id } = req.params;
     
     const warehouse = await Warehouse.findById(id)
-      .populate('currentStock.productId', 'name sku category sellingPrice');
+      .populate('currentStock.productId', 'name sku category sellingPrice hasVariants variants');
     
     if (!warehouse) {
       return res.status(404).json({ error: 'Warehouse not found' });
     }
 
+    // Enrich stock items with variant details
+    const enrichedStock = warehouse.currentStock.map(stockItem => {
+      const stockObj = stockItem.toObject ? stockItem.toObject() : stockItem;
+      const product = stockObj.productId;
+      
+      // If product has variants and this stock item has a variantId, find the variant details
+      if (product && product.hasVariants && product.variants && stockObj.variantId) {
+        const variant = product.variants.find(v => 
+          (v._id && v._id.toString() === stockObj.variantId) || 
+          (v.sku === stockObj.variantId) ||
+          (v.sku && stockObj.variantId && v.sku.toString() === stockObj.variantId.toString())
+        );
+        
+        if (variant) {
+          return {
+            ...stockObj,
+            variantDetails: {
+              name: variant.name,
+              sku: variant.sku,
+              sellingPrice: variant.sellingPrice,
+              attributes: variant.attributes
+            }
+          };
+        }
+      }
+      
+      return stockObj;
+    });
+
     const warehouseData = {
       ...warehouse.toObject(),
+      currentStock: enrichedStock,
       totalStock: warehouse.getTotalStock(),
       capacityUsage: warehouse.getCapacityUsage(),
       availableCapacity: warehouse.capacity - warehouse.getTotalStock()
@@ -44,6 +107,7 @@ const getWarehouseById = async (req, res) => {
 
     res.json(warehouseData);
   } catch (error) {
+    console.error('Get warehouse error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

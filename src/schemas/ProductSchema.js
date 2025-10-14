@@ -111,21 +111,21 @@ const productSchema = new mongoose.Schema({
     },
     default: 'piece'
   },
-  costPrice: {
-    type: Number,
-    required: [true, 'Cost price is required'],
-    min: [0, 'Cost price cannot be negative']
-  },
+  // costPrice: {
+  //   type: Number,
+  //   required: [true, 'Cost price is required'],
+  //   min: [0, 'Cost price cannot be negative']
+  // },
   sellingPrice: {
     type: Number,
     required: [true, 'Selling price is required'],
     min: [0, 'Selling price cannot be negative'],
-    validate: {
-      validator: function(value) {
-        return value >= this.costPrice;
-      },
-      message: 'Selling price must be greater than or equal to cost price'
-    }
+    // validate: {
+    //   validator: function(value) {
+    //     return value >= this.costPrice;
+    //   },
+    //   message: 'Selling price must be greater than or equal to cost price'
+    // }
   },
   description: {
     type: String,
@@ -186,12 +186,12 @@ productSchema.index({ status: 1 });
 productSchema.index({ 'warehouses.warehouseId': 1 });
 
 // Virtual for profit margin
-productSchema.virtual('profitMargin').get(function() {
-  if (this.costPrice > 0) {
-    return ((this.sellingPrice - this.costPrice) / this.costPrice * 100).toFixed(2);
-  }
-  return 0;
-});
+// productSchema.virtual('profitMargin').get(function() {
+//   if (this.costPrice > 0) {
+//     return ((this.sellingPrice - this.costPrice) / this.costPrice * 100).toFixed(2);
+//   }
+//   return 0;
+// });
 
 // Virtual for stock status
 productSchema.virtual('stockStatus').get(function() {

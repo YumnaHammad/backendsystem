@@ -99,71 +99,8 @@ const createSalesOrder = async (req, res) => {
 
     await salesOrder.save();
     
-    // ============================================
-    // RESERVE STOCK IN WAREHOUSE IMMEDIATELY
-    // ============================================
+    // Reservation will occur on dispatch; keep empty array for response compatibility
     const reservedStock = [];
-    
-    for (const item of validatedItems) {
-      let quantityToReserve = item.quantity;
-      
-      // Find warehouses with available stock for this product
-      const warehouses = await Warehouse.find({ isActive: true });
-      
-      for (const warehouse of warehouses) {
-        if (quantityToReserve <= 0) break;
-        
-        // Match by BOTH productId AND variantId
-        const stockItem = warehouse.currentStock.find(stock => 
-          stock.productId.toString() === item.productId.toString() &&
-          (stock.variantId || null) === (item.variantId || null)
-        );
-        
-        if (stockItem) {
-          const availableQty = stockItem.quantity - (stockItem.reservedQuantity || 0);
-          
-          if (availableQty > 0) {
-            const reserveQty = Math.min(availableQty, quantityToReserve);
-            
-            // Initialize reservedQuantity if it doesn't exist
-            if (!stockItem.reservedQuantity) {
-              stockItem.reservedQuantity = 0;
-            }
-            
-            // Add to reserved quantity
-            stockItem.reservedQuantity += reserveQty;
-            quantityToReserve -= reserveQty;
-            
-            await warehouse.save();
-            
-            reservedStock.push({
-              warehouseId: warehouse._id,
-              warehouseName: warehouse.name,
-              productId: item.productId,
-              variantId: item.variantId,
-              variantName: item.variantName,
-              reservedQuantity: reserveQty
-            });
-            
-            // Create stock movement record for reservation
-            const stockMovement = new StockMovement({
-              productId: item.productId,
-              warehouseId: warehouse._id,
-              movementType: 'reserved',
-              quantity: reserveQty,
-              previousQuantity: stockItem.quantity,
-              newQuantity: stockItem.quantity,
-              referenceType: 'sales_order',
-              referenceId: salesOrder._id,
-              notes: `Stock reserved for sales order ${salesOrder.orderNumber}${item.variantName ? ' - ' + item.variantName : ''}`,
-              createdBy: userId
-            });
-            
-            await stockMovement.save();
-          }
-        }
-      }
-    }
     
     // Create audit log (only if user is authenticated)
     if (req.user && userId) {
@@ -186,7 +123,7 @@ const createSalesOrder = async (req, res) => {
     ]);
 
     res.status(201).json({
-      message: 'Sales order created successfully. Stock reserved in warehouse.',
+      message: 'Sales order created successfully.',
       salesOrder,
       stockChecks,
       reservedStock
@@ -284,46 +221,55 @@ const updateSalesOrderStatus = async (req, res) => {
     const oldStatus = salesOrder.status;
     let returnWarehouse = null; // Track warehouse for return status
     
-    // Handle DISPATCH status - release reserved stock when order is in progress
+    // Handle DISPATCH status - reserve stock now so it shows in reserved column
     if (status === 'dispatch' || status === 'dispatched') {
-      console.log('Processing dispatch - releasing reserved stock (order in progress)');
+      console.log('Processing dispatch - reserving stock (move to reserved column)');
       
       const warehouses = await Warehouse.find({ isActive: true });
       
       for (const item of salesOrder.items) {
-        let quantityToRelease = item.quantity;
+        const itemProductId = (item.productId && item.productId._id)
+          ? item.productId._id.toString()
+          : item.productId.toString();
+        let quantityToReserve = item.quantity;
         
         for (const warehouse of warehouses) {
-          if (quantityToRelease <= 0) break;
+          if (quantityToReserve <= 0) break;
           
           // Match by BOTH productId AND variantId
           const stockItem = warehouse.currentStock.find(stock => 
-            stock.productId.toString() === item.productId.toString() &&
+            stock.productId.toString() === itemProductId &&
             (stock.variantId || null) === (item.variantId || null)
           );
           
-          if (stockItem && stockItem.reservedQuantity > 0) {
-            const releaseQty = Math.min(stockItem.reservedQuantity, quantityToRelease);
-            stockItem.reservedQuantity -= releaseQty;
-            quantityToRelease -= releaseQty;
-            
-            await warehouse.save();
-            
-            // Create stock movement record for release
-            const stockMovement = new StockMovement({
-              productId: item.productId,
-              warehouseId: warehouse._id,
-              movementType: 'unreserved',
-              quantity: releaseQty,
-              previousQuantity: stockItem.quantity,
-              newQuantity: stockItem.quantity,
-              referenceType: 'sales_order',
-              referenceId: salesOrder._id,
-              notes: `Reserved stock released - order dispatched ${salesOrder.orderNumber}${item.variantName ? ' - ' + item.variantName : ''}`,
-              createdBy: req.user?._id || salesOrder.createdBy
-            });
-            
-            await stockMovement.save();
+          if (stockItem) {
+            const availableQty = (stockItem.quantity || 0) - (stockItem.reservedQuantity || 0);
+            if (availableQty > 0) {
+              const reserveQty = Math.min(availableQty, quantityToReserve);
+              
+              if (!stockItem.reservedQuantity) {
+                stockItem.reservedQuantity = 0;
+              }
+              stockItem.reservedQuantity += reserveQty;
+              quantityToReserve -= reserveQty;
+              
+              await warehouse.save();
+              
+              // Create stock movement record for reservation
+              const stockMovement = new StockMovement({
+                productId: item.productId,
+                warehouseId: warehouse._id,
+                movementType: 'reserved',
+                quantity: reserveQty,
+                previousQuantity: stockItem.quantity,
+                newQuantity: stockItem.quantity,
+                referenceType: 'sales_order',
+                referenceId: salesOrder._id,
+                notes: `Stock reserved for dispatch ${salesOrder.orderNumber}${item.variantName ? ' - ' + item.variantName : ''}`,
+                createdBy: req.user?._id || salesOrder.createdBy
+              });
+              await stockMovement.save();
+            }
           }
         }
       }
@@ -337,6 +283,9 @@ const updateSalesOrderStatus = async (req, res) => {
       const warehouses = await Warehouse.find({ isActive: true });
       
       for (const item of salesOrder.items) {
+        const itemProductId = (item.productId && item.productId._id)
+          ? item.productId._id.toString()
+          : item.productId.toString();
         let quantityToRelease = item.quantity;
         
         for (const warehouse of warehouses) {
@@ -344,7 +293,7 @@ const updateSalesOrderStatus = async (req, res) => {
           
           // Match by BOTH productId AND variantId
           const stockItem = warehouse.currentStock.find(stock => 
-            stock.productId.toString() === item.productId.toString() &&
+            stock.productId.toString() === itemProductId &&
             (stock.variantId || null) === (item.variantId || null)
           );
           
@@ -375,46 +324,70 @@ const updateSalesOrderStatus = async (req, res) => {
       }
     }
     
-    // Handle DELIVERED status - Remove from actual stock quantity
+    // Handle DELIVERED status - Remove from actual stock quantity and ensure reserved is 0
     if (status === 'delivered') {
-      console.log('Processing delivery - removing from stock quantity');
+      console.log('Processing delivery - removing from stock quantity and clearing any reserved');
       
       const warehouses = await Warehouse.find({ isActive: true });
       
       for (const item of salesOrder.items) {
+        const itemProductId = (item.productId && item.productId._id)
+          ? item.productId._id.toString()
+          : item.productId.toString();
         let quantityToRemove = item.quantity;
+        let reservedToRelease = item.quantity;
         
         for (const warehouse of warehouses) {
-          if (quantityToRemove <= 0) break;
+          if (quantityToRemove <= 0 && reservedToRelease <= 0) break;
           
           const stockItem = warehouse.currentStock.find(stock => 
-            stock.productId.toString() === item.productId.toString() &&
+            stock.productId.toString() === itemProductId &&
             (stock.variantId || null) === (item.variantId || null)
           );
           
-          if (stockItem && stockItem.quantity > 0) {
-            const removeQty = Math.min(stockItem.quantity, quantityToRemove);
+          if (stockItem) {
+            // First, clear any remaining reserved quantity (in case order skipped dispatch)
+            if (stockItem.reservedQuantity > 0 && reservedToRelease > 0) {
+              const releaseQty = Math.min(stockItem.reservedQuantity, reservedToRelease);
+              stockItem.reservedQuantity -= releaseQty;
+              reservedToRelease -= releaseQty;
+              console.log(`Cleared ${releaseQty} reserved quantity on delivery`);
+            }
             
-            // REMOVE from actual quantity only (reserved was already cleared on dispatch)
-            stockItem.quantity -= removeQty;
-            quantityToRemove -= removeQty;
-            
-            await warehouse.save();
-            
-            // Create stock movement
-            const stockMovement = new StockMovement({
-              productId: item.productId,
-              warehouseId: warehouse._id,
-              movementType: 'out',
-              quantity: removeQty,
-              previousQuantity: stockItem.quantity + removeQty,
-              newQuantity: stockItem.quantity,
-              referenceType: 'sales_order',
-              referenceId: salesOrder._id,
-              notes: `Delivered for sales order ${salesOrder.orderNumber}${item.variantName ? ' - ' + item.variantName : ''}`,
-              createdBy: req.user?._id || salesOrder.createdBy
-            });
-            await stockMovement.save();
+            // Then, remove from actual quantity and add to delivered quantity
+            if (stockItem.quantity > 0 && quantityToRemove > 0) {
+              const removeQty = Math.min(stockItem.quantity, quantityToRemove);
+              stockItem.quantity -= removeQty;
+              quantityToRemove -= removeQty;
+              
+              // Add to delivered quantity tracking
+              if (!stockItem.deliveredQuantity) {
+                stockItem.deliveredQuantity = 0;
+              }
+              stockItem.deliveredQuantity += removeQty;
+              
+              // Ensure reserved is explicitly 0 for this item
+              if (stockItem.reservedQuantity < 0) {
+                stockItem.reservedQuantity = 0;
+              }
+              
+              await warehouse.save();
+              
+              // Create stock movement
+              const stockMovement = new StockMovement({
+                productId: item.productId,
+                warehouseId: warehouse._id,
+                movementType: 'out',
+                quantity: removeQty,
+                previousQuantity: stockItem.quantity + removeQty,
+                newQuantity: stockItem.quantity,
+                referenceType: 'sales_order',
+                referenceId: salesOrder._id,
+                notes: `Delivered for sales order ${salesOrder.orderNumber}${item.variantName ? ' - ' + item.variantName : ''} (Reserved: 0, Delivered: ${stockItem.deliveredQuantity})`,
+                createdBy: req.user?._id || salesOrder.createdBy
+              });
+              await stockMovement.save();
+            }
           }
         }
       }
@@ -497,6 +470,48 @@ const updateSalesOrderStatus = async (req, res) => {
       
       await returnWarehouse.save();
       console.log('Expected returns column updated and reserved quantities released');
+      
+      // CREATE EXPECTED RETURN RECORD automatically for the red button to work
+      const ExpectedReturn = require('../models/ExpectedReturn');
+      
+      // Check if expected return already exists for this order
+      const existingExpectedReturn = await ExpectedReturn.findOne({
+        salesOrderId: salesOrder._id,
+        status: 'pending'
+      });
+      
+      if (!existingExpectedReturn) {
+        console.log('Creating ExpectedReturn record automatically...');
+        
+        const expectedReturnItems = salesOrder.items.map(item => ({
+          productId: item.productId._id || item.productId,
+          variantId: item.variantId || null,
+          variantName: item.variantName || null,
+          quantity: item.quantity,
+          productName: item.productId.name || 'Unknown Product'
+        }));
+        
+        const expectedReturn = new ExpectedReturn({
+          salesOrderId: salesOrder._id,
+          orderNumber: salesOrder.orderNumber,
+          customerName: salesOrder.customerInfo?.name || salesOrder.customerName || 'Unknown',
+          customerEmail: salesOrder.customerInfo?.email || '',
+          customerPhone: salesOrder.customerInfo?.phone || '',
+          items: expectedReturnItems,
+          expectedReturnDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+          returnReason: 'Customer return request',
+          warehouseId: returnWarehouse._id,
+          notes: 'Auto-created from sales order expected return',
+          refundAmount: salesOrder.totalAmount || 0,
+          status: 'pending',
+          createdBy: req.user?._id || salesOrder.createdBy
+        });
+        
+        await expectedReturn.save();
+        console.log('ExpectedReturn record created:', expectedReturn._id);
+      } else {
+        console.log('ExpectedReturn record already exists');
+      }
     }
     
     // Handle CONFIRMED RETURN - DISABLED (use Expected Returns module instead)
@@ -534,10 +549,14 @@ const updateSalesOrderStatus = async (req, res) => {
             ? `Order added to Expected Returns in ${returnWarehouse ? returnWarehouse.name : 'warehouse'}`
             : status === 'returned' 
             ? `Return confirmed! Stock added to ${returnWarehouse ? returnWarehouse.name : 'warehouse'}`
+            : status === 'delivered'
+            ? 'Order delivered successfully! Reserved stock cleared (0) and stock removed from warehouse.'
             : 'Sales order status updated successfully',
           salesOrder,
           stockRestored: status === 'returned',
           expectedReturn: status === 'expected_return',
+          delivered: status === 'delivered',
+          reservedCleared: status === 'delivered' || status === 'dispatch' || status === 'dispatched',
           warehouseName: returnWarehouse ? returnWarehouse.name : null
     });
 

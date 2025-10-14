@@ -385,7 +385,7 @@ const getMonthlyInventoryReport = async (req, res) => {
     // Get stock movements for the month
     const movements = await StockMovement.find({
       movementDate: { $gte: startOfMonth, $lte: endOfMonth }
-    }).populate('productId', 'name sku unit costPrice sellingPrice')
+    }).populate('productId', 'name sku unit sellingPrice') // costPrice removed
       .populate('warehouseId', 'name location');
 
     // Aggregate movements by product
@@ -399,7 +399,7 @@ const getMonthlyInventoryReport = async (req, res) => {
           productName: movement.productId.name,
           productSku: movement.productId.sku,
           unit: movement.productId.unit,
-          costPrice: movement.productId.costPrice,
+          // costPrice: movement.productId.costPrice, // Commented out
           sellingPrice: movement.productId.sellingPrice,
           openingStock: 0,
           stockIn: 0,
@@ -440,8 +440,8 @@ const getMonthlyInventoryReport = async (req, res) => {
     const report = Object.values(productMovements).sort((a, b) => a.productName.localeCompare(b.productName));
 
     // Calculate totals
-    const totalOpeningValue = report.reduce((sum, item) => sum + (item.openingStock * item.costPrice), 0);
-    const totalClosingValue = report.reduce((sum, item) => sum + (item.closingStock * item.costPrice), 0);
+    // const totalOpeningValue = report.reduce((sum, item) => sum + (item.openingStock * item.costPrice), 0); // Commented out - costPrice removed
+    // const totalClosingValue = report.reduce((sum, item) => sum + (item.closingStock * item.costPrice), 0); // Commented out - costPrice removed
     const totalStockIn = report.reduce((sum, item) => sum + item.stockIn, 0);
     const totalStockOut = report.reduce((sum, item) => sum + item.stockOut, 0);
 
@@ -454,8 +454,8 @@ const getMonthlyInventoryReport = async (req, res) => {
       },
       summary: {
         totalProducts: report.length,
-        totalOpeningValue,
-        totalClosingValue,
+        // totalOpeningValue, // Commented out - costPrice removed
+        // totalClosingValue, // Commented out - costPrice removed
         totalStockIn,
         totalStockOut,
         netChange: totalStockIn - totalStockOut

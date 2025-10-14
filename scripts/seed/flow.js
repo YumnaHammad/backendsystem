@@ -131,7 +131,7 @@ const seedFlow = async () => {
       sku: "PROD-DELIVERED-001",
       category: "Electronics",
       unit: "pcs",
-      costPrice: 100,
+      // costPrice: 100,
       sellingPrice: 150,
       createdAt: new Date('2025-10-01T09:10:00+05:00')
     });
@@ -141,7 +141,7 @@ const seedFlow = async () => {
       sku: "PROD-RETURNED-002",
       category: "Accessories",
       unit: "pcs",
-      costPrice: 20,
+      // costPrice: 20,
       sellingPrice: 35,
       createdAt: new Date('2025-10-01T09:12:00+05:00')
     });
@@ -151,7 +151,7 @@ const seedFlow = async () => {
       sku: "PROD-PURCHASED-003",
       category: "Spare Parts",
       unit: "pcs",
-      costPrice: 5,
+      // costPrice: 5,
       sellingPrice: 10,
       createdAt: new Date('2025-10-01T09:14:00+05:00')
     });

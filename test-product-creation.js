@@ -15,7 +15,7 @@ async function testProductCreation() {
       sku: 'TEST-' + Date.now(),
       description: 'This is a test product',
       category: 'Test Category',
-      costPrice: 100,
+      // costPrice: 100,
       sellingPrice: 150,
       reorderLevel: 10,
       isActive: true
@@ -34,7 +34,7 @@ async function testProductCreation() {
       console.log('✅ Product found in database!');
       console.log('Name:', foundProduct.name);
       console.log('SKU:', foundProduct.sku);
-      console.log('Cost Price:', foundProduct.costPrice);
+      // console.log('Cost Price:', foundProduct.costPrice);
       console.log('Selling Price:', foundProduct.sellingPrice);
     } else {
       console.log('❌ Product not found in database!');

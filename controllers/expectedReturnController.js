@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const ExpectedReturn = require('../models/ExpectedReturn');
 const SalesOrder = require('../models/SalesOrder');
 const Product = require('../models/Product');
@@ -156,7 +157,8 @@ const updateExpectedReturnStatus = async (req, res) => {
     const { id } = req.params;
     const { status, actualReturnDate, notes, warehouseId } = req.body;
     
-    const expectedReturn = await ExpectedReturn.findById(id).populate('items.productId');
+    // Do NOT populate productId here to ensure we always have the raw ObjectId even if product was deleted
+    const expectedReturn = await ExpectedReturn.findById(id);
     
     if (!expectedReturn) {
       return res.status(404).json({ error: 'Expected return not found' });
@@ -180,39 +182,97 @@ const updateExpectedReturnStatus = async (req, res) => {
     
     // If status is 'received', add stock back to warehouse with 'returned' tag
     if (status === 'received') {
-      const targetWarehouseId = warehouseId || expectedReturn.warehouseId;
+      console.log('Processing received status for expected return:', expectedReturn._id);
+      let targetWarehouseId = warehouseId || expectedReturn.warehouseId;
       
       if (!targetWarehouseId) {
-        return res.status(400).json({ error: 'Please select a warehouse to receive the return' });
+        // Fallback: pick first active warehouse
+        const fallbackWh = await Warehouse.findOne({ isActive: true });
+        if (!fallbackWh) {
+          return res.status(400).json({ error: 'No warehouse available to receive the return' });
+        }
+        targetWarehouseId = fallbackWh._id;
       }
       
+      console.log('Looking up warehouse:', targetWarehouseId);
       const warehouse = await Warehouse.findById(targetWarehouseId);
       
       if (!warehouse) {
+        console.error('Warehouse not found:', targetWarehouseId);
         return res.status(404).json({ error: 'Warehouse not found' });
       }
+      console.log('Warehouse found:', warehouse.name);
       
+      // Ensure currentStock array exists
+      if (!Array.isArray(warehouse.currentStock)) {
+        warehouse.currentStock = [];
+      }
+      
+      // Determine createdBy for stock movements (prefer request user, then linked sales order creator, then expectedReturn creator, then admin)
+      let createdByUserId = req.user?._id;
+      let linkedSalesOrder = null;
+      if (!createdByUserId) {
+        try {
+          linkedSalesOrder = await SalesOrder.findById(expectedReturn.salesOrderId);
+          createdByUserId = linkedSalesOrder?.createdBy || expectedReturn.createdBy;
+        } catch (e) {
+          console.warn('Failed to load linked sales order for createdBy fallback:', e.message);
+        }
+      }
+      if (!createdByUserId) {
+        try {
+          const User = require('../models/User');
+          const adminUser = await User.findOne({ role: 'admin', isActive: true });
+          if (adminUser) {
+            createdByUserId = adminUser._id;
+          }
+        } catch (e) {
+          console.warn('Could not resolve fallback user for stock movement:', e.message);
+        }
+      }
+      // Absolute fallback to a zero ObjectId to satisfy schema if none resolved
+      if (!createdByUserId) {
+        createdByUserId = new mongoose.Types.ObjectId('000000000000000000000000');
+      }
+      
+      console.log('Processing items:', expectedReturn.items.length);
       for (const item of expectedReturn.items) {
-        const product = item.productId;
+        console.log('Processing item:', item);
+        const product = item.productId; // could be ObjectId or string
+        if (!product) {
+          console.warn('ExpectedReturn item missing productId, skipping');
+          continue;
+        }
+        const productIdStr = (product && product._id)
+          ? product._id.toString()
+          : product.toString();
+        const itemVariantId = item.variantId || null;
+        console.log('Product ID string:', productIdStr, 'Variant ID:', itemVariantId);
         
         // Find or create stock entry by productId AND variantId
         let stockItem = warehouse.currentStock.find(stock =>
-          stock.productId.toString() === product._id.toString() &&
-          (stock.variantId || null) === (item.variantId || null)
+          stock.productId.toString() === productIdStr &&
+          (stock.variantId || null) === itemVariantId
         );
         
         if (stockItem) {
           // Move from expectedReturns to actual quantity AND returnedQuantity
-          if (stockItem.expectedReturns && stockItem.expectedReturns >= item.quantity) {
-            stockItem.expectedReturns -= item.quantity;
+          const itemQty = Number(item.quantity) || 0;
+          if (stockItem.expectedReturns && stockItem.expectedReturns >= itemQty) {
+            stockItem.expectedReturns -= itemQty;
           }
-          stockItem.quantity += item.quantity;
+          stockItem.quantity += itemQty;
           
           // Track returned quantity
           if (!stockItem.returnedQuantity) {
             stockItem.returnedQuantity = 0;
           }
-          stockItem.returnedQuantity += item.quantity;
+          stockItem.returnedQuantity += itemQty;
+          
+          // Decrease delivered quantity since items came back
+          if (stockItem.deliveredQuantity && stockItem.deliveredQuantity > 0) {
+            stockItem.deliveredQuantity = Math.max(0, stockItem.deliveredQuantity - itemQty);
+          }
           
           // Add 'returned' tag
           if (!stockItem.tags) {
@@ -226,36 +286,50 @@ const updateExpectedReturnStatus = async (req, res) => {
             stockItem.tags.push(item.condition);
           }
         } else {
-          warehouse.currentStock.push({
-            productId: product._id,
-            variantId: item.variantId || null,
+          const itemQty2 = Number(item.quantity) || 0;
+          const newEntry = {
+            productId: (product && product._id) ? product._id : product,
+            variantId: itemVariantId,
             variantName: item.variantName || null,
-            quantity: item.quantity,
+            quantity: itemQty2,
             reservedQuantity: 0,
             expectedReturns: 0,
-            returnedQuantity: item.quantity,
+            returnedQuantity: itemQty2,
             tags: ['returned', item.condition].filter(Boolean)
-          });
+          };
+          warehouse.currentStock.push(newEntry);
+          stockItem = newEntry; // so movement quantities compute correctly below
         }
         
         // Create stock movement
         const StockMovement = require('../models/StockMovement');
         const stockMovement = new StockMovement({
-          productId: product._id,
+          productId: (product && product._id) ? product._id : product,
           warehouseId: warehouse._id,
           movementType: 'in',
-          quantity: item.quantity,
-          previousQuantity: stockItem ? stockItem.quantity - item.quantity : 0,
-          newQuantity: stockItem ? stockItem.quantity : item.quantity,
+          quantity: Number(item.quantity) || 0,
+          previousQuantity: stockItem ? stockItem.quantity - (Number(item.quantity) || 0) : 0,
+          newQuantity: stockItem ? stockItem.quantity : (Number(item.quantity) || 0),
           referenceType: 'return',
           referenceId: expectedReturn._id,
           notes: `Expected return received from order ${expectedReturn.orderNumber}`,
-          createdBy: req.user?._id || expectedReturn.createdBy
+          createdBy: createdByUserId
         });
         await stockMovement.save();
       }
       
       await warehouse.save();
+      
+      // Also update the related sales order status to 'returned'
+      try {
+        const salesOrder = linkedSalesOrder || await SalesOrder.findById(expectedReturn.salesOrderId);
+        if (salesOrder) {
+          salesOrder.status = 'returned';
+          await salesOrder.save();
+        }
+      } catch (e) {
+        console.warn('Failed to update related sales order to returned:', e.message);
+      }
       expectedReturn.warehouseName = warehouse.name;
     }
     
@@ -284,7 +358,17 @@ const updateExpectedReturnStatus = async (req, res) => {
     });
   } catch (error) {
     console.error('Update expected return status error:', error);
-    res.status(500).json({ error: 'Internal server error', details: error.message });
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    console.error('Request params:', { id, status, actualReturnDate, notes, warehouseId });
+    console.error('Expected return found:', !!expectedReturn);
+    res.status(500).json({ 
+      error: error.message || 'Internal server error', 
+      details: error.stack || error.name,
+      errorType: error.name,
+      requestData: { id, status, actualReturnDate, notes, warehouseId }
+    });
   }
 };
 
@@ -345,12 +429,130 @@ const deleteExpectedReturn = async (req, res) => {
   }
 };
 
+// New simplified return received process
+const processReturnReceived = async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log('=== PROCESSING RETURN RECEIVED ===');
+    console.log('Expected return ID:', id);
+    
+    // Step 1: Find the expected return
+    const expectedReturn = await ExpectedReturn.findById(id);
+    if (!expectedReturn) {
+      return res.status(404).json({ error: 'Expected return not found' });
+    }
+    console.log('Found expected return:', expectedReturn.orderNumber);
+    
+    // Step 2: Find target warehouse
+    let warehouse = null;
+    if (expectedReturn.warehouseId) {
+      warehouse = await Warehouse.findById(expectedReturn.warehouseId);
+    }
+    
+    if (!warehouse) {
+      warehouse = await Warehouse.findOne({ isActive: true });
+      if (!warehouse) {
+        return res.status(400).json({ error: 'No active warehouse found' });
+      }
+    }
+    console.log('Using warehouse:', warehouse.name);
+    
+    // Step 3: Process each item
+    for (const item of expectedReturn.items) {
+      console.log('Processing item:', item);
+      
+      const productId = item.productId.toString();
+      const variantId = item.variantId || null;
+      const quantity = Number(item.quantity) || 0;
+      
+      if (!quantity || quantity <= 0) {
+        console.warn('Invalid quantity for item:', item);
+        continue;
+      }
+      
+      // Find existing stock item
+      let stockItem = warehouse.currentStock.find(stock =>
+        stock.productId.toString() === productId &&
+        (stock.variantId || null) === variantId
+      );
+      
+      if (stockItem) {
+        // Update existing stock
+        console.log('Updating existing stock item');
+        stockItem.quantity += quantity;
+        stockItem.returnedQuantity = (stockItem.returnedQuantity || 0) + quantity;
+        
+        // Reduce expected returns if any
+        if (stockItem.expectedReturns && stockItem.expectedReturns > 0) {
+          stockItem.expectedReturns = Math.max(0, stockItem.expectedReturns - quantity);
+        }
+        
+        // Add returned tag
+        if (!stockItem.tags) stockItem.tags = [];
+        if (!stockItem.tags.includes('returned')) {
+          stockItem.tags.push('returned');
+        }
+      } else {
+        // Create new stock item
+        console.log('Creating new stock item');
+        warehouse.currentStock.push({
+          productId: item.productId,
+          variantId: variantId,
+          variantName: item.variantName || null,
+          quantity: quantity,
+          reservedQuantity: 0,
+          expectedReturns: 0,
+          returnedQuantity: quantity,
+          deliveredQuantity: 0,
+          tags: ['returned']
+        });
+      }
+    }
+    
+    // Step 4: Save warehouse
+    await warehouse.save();
+    console.log('Warehouse saved successfully');
+    
+    // Step 5: Update expected return status
+    expectedReturn.status = 'received';
+    expectedReturn.actualReturnDate = new Date();
+    await expectedReturn.save();
+    console.log('Expected return status updated to received');
+    
+    // Step 6: Update sales order status
+    const salesOrder = await SalesOrder.findById(expectedReturn.salesOrderId);
+    if (salesOrder) {
+      salesOrder.status = 'returned';
+      await salesOrder.save();
+      console.log('Sales order status updated to returned');
+    }
+    
+    console.log('=== RETURN PROCESS COMPLETED SUCCESSFULLY ===');
+    
+    res.json({
+      message: 'Return processed successfully',
+      expectedReturn,
+      warehouseName: warehouse.name
+    });
+    
+  } catch (error) {
+    console.error('=== RETURN PROCESS ERROR ===');
+    console.error('Error:', error.message);
+    console.error('Stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Failed to process return',
+      details: error.message 
+    });
+  }
+};
+
 module.exports = {
   getAllExpectedReturns,
   getExpectedReturnById,
   createExpectedReturn,
   updateExpectedReturnStatus,
   getExpectedReturnsByProduct,
-  deleteExpectedReturn
+  deleteExpectedReturn,
+  processReturnReceived
 };
 

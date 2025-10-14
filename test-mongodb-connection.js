@@ -108,7 +108,7 @@ async function testDatabaseOperations() {
             sku: 'TEST-001',
             category: 'Test',
             unit: 'piece',
-            costPrice: 10,
+            // costPrice: 10,
             sellingPrice: 15,
             currentStock: 0,
             warehouses: []

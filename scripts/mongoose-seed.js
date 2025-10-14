@@ -180,7 +180,7 @@ const createProducts = async () => {
       description: 'High-performance laptop computers for business and personal use',
       category: 'Electronics',
       unit: 'pcs',
-      costPrice: 180000,
+      // costPrice: 180000,
       sellingPrice: 250000,
       isActive: true
     },
@@ -190,7 +190,7 @@ const createProducts = async () => {
       description: 'Ergonomic office chairs for comfortable working',
       category: 'Furniture',
       unit: 'pcs',
-      costPrice: 35000,
+      // costPrice: 35000,
       sellingPrice: 45000,
       isActive: true
     },
@@ -200,7 +200,7 @@ const createProducts = async () => {
       description: 'Wireless computer mice for enhanced productivity',
       category: 'Electronics',
       unit: 'pcs',
-      costPrice: 3500,
+      // costPrice: 3500,
       sellingPrice: 5000,
       isActive: true
     },
@@ -210,7 +210,7 @@ const createProducts = async () => {
       description: 'LED desk lamps for optimal lighting',
       category: 'Furniture',
       unit: 'pcs',
-      costPrice: 6000,
+      // costPrice: 6000,
       sellingPrice: 8000,
       isActive: true
     },
@@ -220,7 +220,7 @@ const createProducts = async () => {
       description: 'Premium and basic notebook sets for office use',
       category: 'Stationery',
       unit: 'boxes',
-      costPrice: 1500,
+      // costPrice: 1500,
       sellingPrice: 2000,
       isActive: true
     },
@@ -230,7 +230,7 @@ const createProducts = async () => {
       description: '24-inch LED monitors for office use',
       category: 'Electronics',
       unit: 'pcs',
-      costPrice: 45000,
+      // costPrice: 45000,
       sellingPrice: 60000,
       isActive: true
     },
@@ -240,7 +240,7 @@ const createProducts = async () => {
       description: 'Mechanical keyboards for enhanced typing experience',
       category: 'Electronics',
       unit: 'pcs',
-      costPrice: 8000,
+      // costPrice: 8000,
       sellingPrice: 12000,
       isActive: true
     },
@@ -250,7 +250,7 @@ const createProducts = async () => {
       description: 'Laser printers for office documentation',
       category: 'Electronics',
       unit: 'pcs',
-      costPrice: 65000,
+      // costPrice: 65000,
       sellingPrice: 85000,
       isActive: true
     }
@@ -341,7 +341,8 @@ const createPurchases = async (products, suppliers, warehouses, users) => {
       const product = products[Math.floor(Math.random() * products.length)];
       if (!selectedProducts.find(p => p.productId.toString() === product._id.toString())) {
         const quantity = Math.floor(Math.random() * 50) + 10;
-        const unitPrice = product.costPrice + (Math.random() * 1000 - 500);
+        // const unitPrice = product.costPrice + (Math.random() * 1000 - 500);
+        const unitPrice = product.sellingPrice || 1000; // Use sellingPrice as fallback
         selectedProducts.push({
           productId: product._id,
           quantity: quantity,

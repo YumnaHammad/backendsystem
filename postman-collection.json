@@ -118,7 +118,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Test Product\",\n  \"sku\": \"TEST-001\",\n  \"category\": \"Electronics\",\n  \"unit\": \"pcs\",\n  \"costPrice\": 50,\n  \"sellingPrice\": 75\n}"
+              "raw": "{\n  \"name\": \"Test Product\",\n  \"sku\": \"TEST-001\",\n  \"category\": \"Electronics\",\n  \"unit\": \"pcs\",\n  \"sellingPrice\": 75\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/products",

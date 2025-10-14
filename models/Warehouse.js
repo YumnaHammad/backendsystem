@@ -50,6 +50,11 @@ const warehouseSchema = new mongoose.Schema({
       default: 0,
       min: 0
     },
+    deliveredQuantity: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
     tags: [{
       type: String,
       enum: ['returned', 'damaged', 'expired']
@@ -81,10 +86,12 @@ warehouseSchema.methods.getCapacityUsage = function() {
   return (totalStock / this.capacity) * 100;
 };
 
-// Method to update stock for a product
-warehouseSchema.methods.updateStock = function(productId, quantity, tags = []) {
+// Method to update stock for a product (with variant support)
+warehouseSchema.methods.updateStock = function(productId, quantity, tags = [], variantId = null, variantName = null) {
+  // Find existing stock item for this product AND variant combination
   const stockItem = this.currentStock.find(item => 
-    item.productId.toString() === productId.toString()
+    item.productId.toString() === productId.toString() &&
+    (variantId ? item.variantId === variantId : !item.variantId)
   );
   
   if (stockItem) {
@@ -96,6 +103,8 @@ warehouseSchema.methods.updateStock = function(productId, quantity, tags = []) {
   } else {
     this.currentStock.push({
       productId,
+      variantId,
+      variantName,
       quantity,
       tags,
       returnedAt: tags.includes('returned') ? new Date() : undefined
