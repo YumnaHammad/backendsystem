@@ -17,6 +17,14 @@ const purchaseSchema = new mongoose.Schema({
       ref: 'Product',
       required: true
     },
+    variantId: {
+      type: String,
+      default: null
+    },
+    variantName: {
+      type: String,
+      default: null
+    },
     quantity: {
       type: Number,
       required: true,
@@ -198,7 +206,7 @@ purchaseSchema.methods.markPaymentCleared = async function() {
 
 // Method to update stock after payment is cleared
 purchaseSchema.methods.updateStockAfterPayment = async function() {
-  const { Warehouse } = require('./index');
+  const { Warehouse, StockMovement } = require('./index');
   
   try {
     // Get default warehouse or first active warehouse
@@ -209,15 +217,63 @@ purchaseSchema.methods.updateStockAfterPayment = async function() {
       return;
     }
     
-    // Add each item to warehouse stock
+    // Add each item to warehouse stock WITH VARIANT INFO
     for (const item of this.items) {
-      await warehouse.updateStock(item.productId, item.quantity, []);
+      console.log(`Processing item: quantity=${item.quantity}, productId=${item.productId}, variantId=${item.variantId}`);
+      
+      // Find existing stock item by BOTH productId AND variantId
+      const stockItem = warehouse.currentStock.find(stock => 
+        stock.productId.toString() === item.productId.toString() &&
+        (stock.variantId || null) === (item.variantId || null)
+      );
+      
+      const previousQuantity = stockItem ? stockItem.quantity : 0;
+      console.log(`Previous quantity in warehouse: ${previousQuantity}`);
+      
+      // Update or add stock with variant information
+      if (stockItem) {
+        console.log(`Updating existing stock: ${previousQuantity} + ${item.quantity} = ${previousQuantity + item.quantity}`);
+        stockItem.quantity += item.quantity;
+        if (item.variantName && !stockItem.variantName) {
+          stockItem.variantName = item.variantName;
+        }
+      } else {
+        console.log(`Adding NEW stock entry: quantity=${item.quantity}`);
+        warehouse.currentStock.push({
+          productId: item.productId,
+          variantId: item.variantId || null,
+          variantName: item.variantName || null,
+          quantity: item.quantity,
+          reservedQuantity: 0,
+          tags: []
+        });
+      }
+      
+      const newQuantity = stockItem ? stockItem.quantity : item.quantity;
+      console.log(`New quantity in warehouse: ${newQuantity}`);
+      
+      // Create stock movement record
+      const stockMovement = new StockMovement({
+        productId: item.productId,
+        warehouseId: warehouse._id,
+        movementType: 'in',
+        quantity: item.quantity,
+        previousQuantity: previousQuantity,
+        newQuantity: newQuantity,
+        referenceType: 'purchase',
+        referenceId: this._id,
+        notes: `Stock added from purchase ${this.purchaseNumber}${item.variantName ? ' - ' + item.variantName : ''} after payment cleared`,
+        createdBy: this.createdBy
+      });
+      
+      await stockMovement.save();
     }
     
     await warehouse.save();
-    console.log(`Stock updated for purchase ${this.purchaseNumber}`);
+    console.log(`Stock updated for purchase ${this.purchaseNumber} after payment cleared`);
   } catch (error) {
     console.error('Error updating stock after payment:', error);
+    throw error;
   }
 };
 

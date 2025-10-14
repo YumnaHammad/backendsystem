@@ -67,11 +67,24 @@ const createPurchase = async (req, res) => {
         });
       }
 
+      // Get variant info if provided
+      let variantName = null;
+      if (item.variantId && product.hasVariants && product.variants) {
+        const variant = product.variants.find(v => 
+          (v._id?.toString() === item.variantId || v.sku === item.variantId)
+        );
+        if (variant) {
+          variantName = variant.name;
+        }
+      }
+
       const itemTotal = item.quantity * item.unitPrice;
       totalAmount += itemTotal;
 
       validatedItems.push({
         productId: item.productId,
+        variantId: item.variantId || null,
+        variantName: variantName,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         totalPrice: itemTotal
@@ -128,50 +141,9 @@ const createPurchase = async (req, res) => {
 
     await purchase.save();
 
-    // Automatically add stock to the first available warehouse
-    const warehouse = await Warehouse.findOne({});
-    if (warehouse) {
-      // Add stock to warehouse for each item
-      for (const item of validatedItems) {
-        const stockItem = warehouse.currentStock.find(stock => 
-          stock.productId.toString() === item.productId
-        );
-
-        if (stockItem) {
-          stockItem.quantity += item.quantity;
-        } else {
-          warehouse.currentStock.push({
-            productId: item.productId,
-            quantity: item.quantity,
-            reservedQuantity: 0
-          });
-        }
-
-        // Create stock movement record
-        const stockMovement = new StockMovement({
-          productId: item.productId,
-          warehouseId: warehouse._id,
-          movementType: 'in',
-          quantity: item.quantity,
-          previousQuantity: stockItem ? stockItem.quantity - item.quantity : 0,
-          newQuantity: stockItem ? stockItem.quantity : item.quantity,
-          referenceType: 'purchase',
-          referenceId: purchase._id,
-          notes: `Received from purchase ${purchase.purchaseNumber}`,
-          createdBy: req.user ? req.user._id : null
-        });
-
-        await stockMovement.save();
-      }
-
-      await warehouse.save();
-
-      // Update purchase status to received
-      purchase.status = 'received';
-      purchase.receivedDate = new Date();
-      await purchase.save();
-    }
-
+    // NOTE: Stock will ONLY be added to warehouse when payment status is marked as "paid"
+    // This ensures inventory accuracy and proper payment tracking
+    
     // Audit log will be created by middleware
 
     // Populate supplier and items for response
@@ -182,7 +154,7 @@ const createPurchase = async (req, res) => {
     ]);
 
     res.status(201).json({
-      message: 'Purchase created and stock added successfully',
+      message: 'Purchase order created successfully. Stock will be added after payment is marked as paid.',
       purchase
     });
 
@@ -342,6 +314,9 @@ const generateReceipt = async (req, res) => {
     purchase.paymentStatus = 'paid';
     purchase.paymentDate = new Date();
     purchase.receiptNumber = receipt.receiptNumber;
+    
+    // Add stock to warehouse now that payment is cleared
+    await purchase.updateStockAfterPayment();
 
     await purchase.save();
 
@@ -364,9 +339,10 @@ const generateReceipt = async (req, res) => {
     }
 
     res.json({
-      message: 'Receipt generated successfully',
+      message: 'Payment marked as paid. Receipt generated and stock added to warehouse successfully.',
       receipt,
-      purchase
+      purchase,
+      stockAdded: true
     });
 
   } catch (error) {

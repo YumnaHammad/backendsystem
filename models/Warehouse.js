@@ -22,12 +22,30 @@ const warehouseSchema = new mongoose.Schema({
       ref: 'Product',
       required: true
     },
+    variantId: {
+      type: String,
+      default: null
+    },
+    variantName: {
+      type: String,
+      default: null
+    },
     quantity: {
       type: Number,
       default: 0,
       min: 0
     },
     reservedQuantity: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    expectedReturns: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    returnedQuantity: {
       type: Number,
       default: 0,
       min: 0

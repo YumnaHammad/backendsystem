@@ -8,7 +8,7 @@ const getAllWarehouses = async (req, res) => {
     const query = isActive !== undefined ? { isActive: isActive === 'true' } : {};
     
     const warehouses = await Warehouse.find(query)
-      .populate('currentStock.productId', 'name sku')
+      .populate('currentStock.productId', 'name sku sellingPrice hasVariants variants')
       .sort({ createdAt: -1 });
 
     const warehousesWithStats = warehouses.map(warehouse => ({
@@ -20,7 +20,6 @@ const getAllWarehouses = async (req, res) => {
 
     res.json(warehousesWithStats);
   } catch (error) {
-    console.error('Get warehouses error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -45,7 +44,6 @@ const getWarehouseById = async (req, res) => {
 
     res.json(warehouseData);
   } catch (error) {
-    console.error('Get warehouse error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -98,7 +96,7 @@ const createWarehouse = async (req, res) => {
           req
         );
       } catch (auditError) {
-        console.error('Audit log error (non-critical):', auditError);
+        // Audit log error is non-critical
       }
     }
 
@@ -107,9 +105,6 @@ const createWarehouse = async (req, res) => {
       warehouse
     });
   } catch (error) {
-    console.error('Create warehouse error:', error);
-    console.error('Error details:', error.message);
-    
     // Handle Mongoose validation errors
     if (error.name === 'ValidationError') {
       const validationErrors = {};
@@ -163,7 +158,7 @@ const updateWarehouse = async (req, res) => {
           req
         );
       } catch (auditError) {
-        console.error('Audit log error (non-critical):', auditError);
+        // Audit log error is non-critical
       }
     }
 
@@ -172,7 +167,6 @@ const updateWarehouse = async (req, res) => {
       warehouse: updatedWarehouse
     });
   } catch (error) {
-    console.error('Update warehouse error:', error);
     res.status(500).json({ 
       error: 'Failed to update warehouse',
       details: error.message
@@ -215,13 +209,12 @@ const deleteWarehouse = async (req, res) => {
           req
         );
       } catch (auditError) {
-        console.error('Audit log error (non-critical):', auditError);
+        // Audit log error is non-critical
       }
     }
 
     res.json({ message: 'Warehouse deleted successfully' });
   } catch (error) {
-    console.error('Delete warehouse error:', error);
     res.status(500).json({ 
       error: 'Failed to delete warehouse',
       details: error.message
@@ -284,7 +277,7 @@ const addStock = async (req, res) => {
           req
         );
       } catch (auditError) {
-        console.error('Audit log error (non-critical):', auditError);
+        // Audit log error is non-critical
       }
     }
 
@@ -305,7 +298,6 @@ const addStock = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Add stock error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -401,7 +393,7 @@ const transferStock = async (req, res) => {
           req
         );
       } catch (auditError) {
-        console.error('Audit log error (non-critical):', auditError);
+        // Audit log error is non-critical
       }
     }
 
@@ -420,7 +412,6 @@ const transferStock = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Transfer stock error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
