@@ -25,7 +25,7 @@ const app = express();
 // Middleware
 app.use(cors({
   origin: true, // Allow all origins for Vercel
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
