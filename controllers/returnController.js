@@ -178,7 +178,22 @@ const processReturn = async (req, res) => {
 
       if (stockItem) {
         const previousQuantity = stockItem.quantity;
-        stockItem.quantity += returnItem.quantity;
+        // ❌ REMOVED: stockItem.quantity += returnItem.quantity; // Don't increase total stock!
+        
+        // Decrease delivered quantity since items came back
+        if (!stockItem.deliveredQuantity) {
+          stockItem.deliveredQuantity = 0;
+        }
+        if (stockItem.deliveredQuantity > 0) {
+          stockItem.deliveredQuantity = Math.max(0, stockItem.deliveredQuantity - returnItem.quantity);
+          console.log(`Reduced delivered quantity by ${returnItem.quantity}, new delivered quantity: ${stockItem.deliveredQuantity}`);
+        }
+        
+        // Add returned quantity tracking
+        if (!stockItem.returnedQuantity) {
+          stockItem.returnedQuantity = 0;
+        }
+        stockItem.returnedQuantity += returnItem.quantity;
         
         // Add return tag if condition is not good
         if (returnItem.condition !== 'good') {
@@ -207,8 +222,10 @@ const processReturn = async (req, res) => {
       } else {
         warehouse.currentStock.push({
           productId: returnItem.productId,
-          quantity: returnItem.quantity,
+          quantity: 0, // ✅ Start with 0 quantity for new items
           reservedQuantity: 0,
+          deliveredQuantity: 0,
+          returnedQuantity: returnItem.quantity,
           tags: returnItem.condition !== 'good' ? ['returned'] : [],
           returnedAt: returnItem.condition !== 'good' ? new Date() : null
         });

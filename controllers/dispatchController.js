@@ -1,4 +1,4 @@
-const { Dispatch, SalesOrder, SalesOrderItem, Variant, Inventory } = require('../models');
+const { Dispatch, SalesOrder, SalesOrderItem, Variant, Inventory, Warehouse, StockMovement } = require('../models');
 
 // Update dispatch status
 const updateDispatchStatus = async (req, res) => {
@@ -41,6 +41,55 @@ const updateDispatchStatus = async (req, res) => {
     
     if (status === 'dispatched' && dispatch.status === 'pending') {
       updateData.dispatchedAt = new Date();
+      
+      // Move items from reserved to delivered in warehouse
+      const warehouses = await Warehouse.find({ isActive: true });
+      
+      for (const item of dispatch.salesOrder.items) {
+        const itemProductId = item.productId;
+        let quantityToMove = item.quantity;
+        
+        for (const warehouse of warehouses) {
+          if (quantityToMove <= 0) break;
+          
+          const stockItem = warehouse.currentStock.find(stock => 
+            stock.productId.toString() === itemProductId.toString() &&
+            (stock.variantId || null) === (item.variantId || null)
+          );
+          
+          if (stockItem && stockItem.reservedQuantity > 0) {
+            const moveQty = Math.min(stockItem.reservedQuantity, quantityToMove);
+            
+            // Move from reserved to delivered
+            stockItem.reservedQuantity -= moveQty;
+            
+            // Add to delivered quantity
+            if (!stockItem.deliveredQuantity) {
+              stockItem.deliveredQuantity = 0;
+            }
+            stockItem.deliveredQuantity += moveQty;
+            
+            quantityToMove -= moveQty;
+            
+            await warehouse.save();
+            
+            // Create stock movement record
+            const stockMovement = new StockMovement({
+              productId: itemProductId,
+              warehouseId: warehouse._id,
+              movementType: 'out',
+              quantity: moveQty,
+              previousQuantity: stockItem.quantity,
+              newQuantity: stockItem.quantity,
+              referenceType: 'sales_order',
+              referenceId: dispatch.salesOrder.id,
+              notes: `Dispatched via dispatch ${dispatch._id} - moved from reserved to delivered`,
+              createdBy: req.user?._id
+            });
+            await stockMovement.save();
+          }
+        }
+      }
     } else if (status === 'delivered' && dispatch.status === 'dispatched') {
       updateData.deliveredAt = new Date();
     } else if (status === 'returned') {

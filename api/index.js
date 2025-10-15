@@ -18,6 +18,7 @@ const userRoutes = require('../routes/users');
 const warehouseRoutes = require('../routes/warehouses');
 const supplierRoutes = require('../routes/suppliers');
 const reportRoutes = require('../routes/reports');
+const cityReportRoutes = require('../routes/cityReports');
 
 const app = express();
 
@@ -95,6 +96,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/warehouses', warehouseRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/city-reports', cityReportRoutes);
 
 // Connect to MongoDB
 // mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/inventory_system', {

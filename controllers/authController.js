@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const bcrypt = require('bcryptjs'); 
 const { createAuditLog } = require('../middleware/audit'); // optional if used
-a
+
 // ✅ REGISTER
 const register = async (req, res) => {
   try {

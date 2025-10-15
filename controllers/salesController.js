@@ -6,6 +6,14 @@ const createSalesOrder = async (req, res) => {
   try {
     const { customerInfo, items, deliveryAddress, expectedDeliveryDate, notes } = req.body;
 
+    // Validate required fields
+    if (!customerInfo?.address?.city) {
+      return res.status(400).json({ 
+        error: 'Customer city is required',
+        field: 'customerInfo.address.city' 
+      });
+    }
+
     // User authentication is optional - use system user if not authenticated
     let userId = req.user?._id || null;
     
@@ -324,9 +332,9 @@ const updateSalesOrderStatus = async (req, res) => {
       }
     }
     
-    // Handle DELIVERED status - Remove from actual stock quantity and ensure reserved is 0
-    if (status === 'delivered') {
-      console.log('Processing delivery - removing from stock quantity and clearing any reserved');
+    // Handle DISPATCHED status - Move from reserved to delivered (items leave warehouse)
+    if (status === 'dispatched') {
+      console.log('Processing dispatched - moving from reserved to delivered');
       
       const warehouses = await Warehouse.find({ isActive: true });
       
@@ -334,60 +342,101 @@ const updateSalesOrderStatus = async (req, res) => {
         const itemProductId = (item.productId && item.productId._id)
           ? item.productId._id.toString()
           : item.productId.toString();
-        let quantityToRemove = item.quantity;
-        let reservedToRelease = item.quantity;
+        let quantityToMove = item.quantity;
         
         for (const warehouse of warehouses) {
-          if (quantityToRemove <= 0 && reservedToRelease <= 0) break;
+          if (quantityToMove <= 0) break;
           
           const stockItem = warehouse.currentStock.find(stock => 
             stock.productId.toString() === itemProductId &&
             (stock.variantId || null) === (item.variantId || null)
           );
           
-          if (stockItem) {
-            // First, clear any remaining reserved quantity (in case order skipped dispatch)
-            if (stockItem.reservedQuantity > 0 && reservedToRelease > 0) {
-              const releaseQty = Math.min(stockItem.reservedQuantity, reservedToRelease);
-              stockItem.reservedQuantity -= releaseQty;
-              reservedToRelease -= releaseQty;
-              console.log(`Cleared ${releaseQty} reserved quantity on delivery`);
-            }
+          if (stockItem && stockItem.reservedQuantity > 0) {
+            const moveQty = Math.min(stockItem.reservedQuantity, quantityToMove);
             
-            // Then, remove from actual quantity and add to delivered quantity
-            if (stockItem.quantity > 0 && quantityToRemove > 0) {
-              const removeQty = Math.min(stockItem.quantity, quantityToRemove);
-              stockItem.quantity -= removeQty;
-              quantityToRemove -= removeQty;
-              
-              // Add to delivered quantity tracking
-              if (!stockItem.deliveredQuantity) {
-                stockItem.deliveredQuantity = 0;
-              }
-              stockItem.deliveredQuantity += removeQty;
-              
-              // Ensure reserved is explicitly 0 for this item
-              if (stockItem.reservedQuantity < 0) {
-                stockItem.reservedQuantity = 0;
-              }
-              
-              await warehouse.save();
-              
-              // Create stock movement
-              const stockMovement = new StockMovement({
-                productId: item.productId,
-                warehouseId: warehouse._id,
-                movementType: 'out',
-                quantity: removeQty,
-                previousQuantity: stockItem.quantity + removeQty,
-                newQuantity: stockItem.quantity,
-                referenceType: 'sales_order',
-                referenceId: salesOrder._id,
-                notes: `Delivered for sales order ${salesOrder.orderNumber}${item.variantName ? ' - ' + item.variantName : ''} (Reserved: 0, Delivered: ${stockItem.deliveredQuantity})`,
-                createdBy: req.user?._id || salesOrder.createdBy
-              });
-              await stockMovement.save();
+            // Move from reserved to delivered
+            stockItem.reservedQuantity -= moveQty;
+            
+            // Add to delivered quantity
+            if (!stockItem.deliveredQuantity) {
+              stockItem.deliveredQuantity = 0;
             }
+            stockItem.deliveredQuantity += moveQty;
+            
+            quantityToMove -= moveQty;
+            
+            await warehouse.save();
+            
+            // Create stock movement record
+            const stockMovement = new StockMovement({
+              productId: item.productId,
+              warehouseId: warehouse._id,
+              movementType: 'out',
+              quantity: moveQty,
+              previousQuantity: stockItem.quantity,
+              newQuantity: stockItem.quantity,
+              referenceType: 'sales_order',
+              referenceId: salesOrder._id,
+              notes: `Dispatched for sales order ${salesOrder.orderNumber}${item.variantName ? ' - ' + item.variantName : ''} (Moved from reserved to delivered)`,
+              createdBy: req.user?._id || salesOrder.createdBy
+            });
+            await stockMovement.save();
+          }
+        }
+      }
+    }
+    
+    // Handle DELIVERED status - Move from reserved to delivered if not already done
+    if (status === 'delivered') {
+      console.log('Processing delivered status - ensuring items are moved from reserved to delivered');
+      
+      const warehouses = await Warehouse.find({ isActive: true });
+      
+      for (const item of salesOrder.items) {
+        const itemProductId = (item.productId && item.productId._id)
+          ? item.productId._id.toString()
+          : item.productId.toString();
+        let quantityToMove = item.quantity;
+        
+        for (const warehouse of warehouses) {
+          if (quantityToMove <= 0) break;
+          
+          const stockItem = warehouse.currentStock.find(stock => 
+            stock.productId.toString() === itemProductId &&
+            (stock.variantId || null) === (item.variantId || null)
+          );
+          
+          if (stockItem && stockItem.reservedQuantity > 0) {
+            const moveQty = Math.min(stockItem.reservedQuantity, quantityToMove);
+            
+            // Move from reserved to delivered
+            stockItem.reservedQuantity -= moveQty;
+            
+            // Add to delivered quantity
+            if (!stockItem.deliveredQuantity) {
+              stockItem.deliveredQuantity = 0;
+            }
+            stockItem.deliveredQuantity += moveQty;
+            
+            quantityToMove -= moveQty;
+            
+            await warehouse.save();
+            
+            // Create stock movement record
+            const stockMovement = new StockMovement({
+              productId: item.productId,
+              warehouseId: warehouse._id,
+              movementType: 'out',
+              quantity: moveQty,
+              previousQuantity: stockItem.quantity,
+              newQuantity: stockItem.quantity,
+              referenceType: 'sales_order',
+              referenceId: salesOrder._id,
+              notes: `Delivered for sales order ${salesOrder.orderNumber}${item.variantName ? ' - ' + item.variantName : ''} (Moved from reserved to delivered)`,
+              createdBy: req.user?._id || salesOrder.createdBy
+            });
+            await stockMovement.save();
           }
         }
       }
