@@ -284,7 +284,7 @@ const getDailyStockReport = async (req, res) => {
   }
 };
 
-// Get weekly sales report
+// Get weekly sales report - Enhanced with detailed product and variant information
 const getWeeklySalesReport = async (req, res) => {
   try {
     const { weekOffset = 0 } = req.query; // 0 = current week, -1 = last week, etc.
@@ -298,67 +298,140 @@ const getWeeklySalesReport = async (req, res) => {
     endOfWeek.setDate(startOfWeek.getDate() + 6);
     endOfWeek.setHours(23, 59, 59, 999);
 
-    // Get sales orders for the week
+    console.log('Weekly Sales Report - Period:', { startOfWeek, endOfWeek });
+
+    // Get all sales orders for the week (not just dispatched/delivered)
     const salesOrders = await SalesOrder.find({
-      orderDate: { $gte: startOfWeek, $lte: endOfWeek },
-      status: { $in: ['dispatched', 'delivered'] }
-    }).populate('items.productId', 'name sku');
+      orderDate: { $gte: startOfWeek, $lte: endOfWeek }
+    })
+    .populate('items.productId', 'name sku category sellingPrice unit')
+    .populate('customerId', 'name email phone')
+    .sort({ orderDate: -1 });
 
-    // Get stock movements for the week
-    const stockMovements = await StockMovement.find({
-      movementType: 'out',
-      movementDate: { $gte: startOfWeek, $lte: endOfWeek }
-    }).populate('productId', 'name sku unit');
+    console.log('Found sales orders:', salesOrders.length);
 
-    // Aggregate sales by product
+    // Calculate summary
+    const totalRevenue = salesOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+    const totalOrders = salesOrders.length;
+    const totalItems = salesOrders.reduce((sum, order) => 
+      sum + order.items.reduce((itemSum, item) => itemSum + (item.quantity || 0), 0), 0
+    );
+
+    // Get detailed product sales with variants
     const productSales = {};
     
-    stockMovements.forEach(movement => {
-      const productId = movement.productId._id.toString();
-      if (!productSales[productId]) {
-        productSales[productId] = {
-          productId: movement.productId._id,
-          productName: movement.productId.name,
-          productSku: movement.productId.sku,
-          unit: movement.productId.unit,
-          quantitySold: 0,
-          orders: 0
-        };
-      }
-      productSales[productId].quantitySold += movement.quantity;
-    });
-
-    // Count orders for each product
     salesOrders.forEach(order => {
       order.items.forEach(item => {
+        if (!item.productId) return; // Skip items without product reference
+        
         const productId = item.productId._id.toString();
-        if (productSales[productId]) {
-          productSales[productId].orders += 1;
+        const variantKey = item.variantName ? `${productId}-${item.variantName}` : productId;
+        
+        if (!productSales[variantKey]) {
+          productSales[variantKey] = {
+            productId: item.productId._id,
+            productName: item.productId.name,
+            productSku: item.productId.sku,
+            category: item.productId.category || 'Uncategorized',
+            unit: item.productId.unit || 'pcs',
+            variantName: item.variantName || 'No Variant',
+            sellingPrice: item.productId.sellingPrice || 0,
+            totalQuantity: 0,
+            totalRevenue: 0,
+            averagePrice: 0,
+            orderCount: 0,
+            orders: [] // Store individual orders for details
+          };
         }
+        
+        productSales[variantKey].totalQuantity += item.quantity || 0;
+        productSales[variantKey].totalRevenue += item.totalPrice || 0;
+        productSales[variantKey].orderCount += 1;
+        productSales[variantKey].orders.push({
+          orderNumber: order.orderNumber,
+          orderDate: order.orderDate,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
+          customerName: order.customerId?.name || 'Unknown',
+          customerPhone: order.customerId?.phone || 'N/A',
+          status: order.status,
+          paymentStatus: order.paymentStatus
+        });
       });
     });
 
-    const report = Object.values(productSales).sort((a, b) => b.quantitySold - a.quantitySold);
+    // Calculate average prices and sort
+    Object.values(productSales).forEach(product => {
+      product.averagePrice = product.totalQuantity > 0 ? product.totalRevenue / product.totalQuantity : 0;
+    });
 
-    // Calculate totals
-    const totalQuantitySold = report.reduce((sum, item) => sum + item.quantitySold, 0);
-    const totalOrders = salesOrders.length;
-    const totalRevenue = salesOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+    // Sort by total quantity sold (most selling products first)
+    const topProducts = Object.values(productSales)
+      .sort((a, b) => b.totalQuantity - a.totalQuantity)
+      .slice(0, 50); // Show top 50 products
 
-    res.json({
+    // Calculate category breakdown
+    const categoryStats = {};
+    Object.values(productSales).forEach(product => {
+      if (!categoryStats[product.category]) {
+        categoryStats[product.category] = {
+          category: product.category,
+          totalQuantity: 0,
+          totalRevenue: 0,
+          productCount: 0,
+          variants: 0
+        };
+      }
+      categoryStats[product.category].totalQuantity += product.totalQuantity;
+      categoryStats[product.category].totalRevenue += product.totalRevenue;
+      categoryStats[product.category].productCount += 1;
+      categoryStats[product.category].variants += product.variantName !== 'No Variant' ? 1 : 0;
+    });
+
+    // Calculate daily sales breakdown
+    const dailySales = {};
+    salesOrders.forEach(order => {
+      const day = new Date(order.orderDate).toISOString().split('T')[0];
+      if (!dailySales[day]) {
+        dailySales[day] = {
+          date: day,
+          orders: 0,
+          revenue: 0,
+          items: 0
+        };
+      }
+      dailySales[day].orders += 1;
+      dailySales[day].revenue += order.totalAmount || 0;
+      dailySales[day].items += order.items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    });
+
+    const response = {
       period: {
         start: startOfWeek,
         end: endOfWeek,
-        weekOffset
+        weekOffset,
+        weekName: `Week ${weekOffset === 0 ? 'Current' : weekOffset > 0 ? `+${weekOffset}` : weekOffset}`
       },
       summary: {
-        totalProductsSold: report.length,
-        totalQuantitySold,
+        totalRevenue,
         totalOrders,
-        totalRevenue
+        totalItems,
+        uniqueProducts: Object.keys(productSales).length,
+        averageOrderValue: totalOrders > 0 ? totalRevenue / totalOrders : 0
       },
-      productSales: report
+      topProducts,
+      categoryBreakdown: Object.values(categoryStats).sort((a, b) => b.totalRevenue - a.totalRevenue),
+      dailyBreakdown: Object.values(dailySales).sort((a, b) => new Date(a.date) - new Date(b.date))
+    };
+
+    console.log('Weekly Sales Report - Response:', {
+      totalProducts: topProducts.length,
+      totalRevenue,
+      totalOrders
     });
+
+    res.json(response);
 
   } catch (error) {
     console.error('Get weekly sales report error:', error);
@@ -366,8 +439,8 @@ const getWeeklySalesReport = async (req, res) => {
   }
 };
 
-// Get monthly inventory report
-const getMonthlyInventoryReport = async (req, res) => {
+// Get monthly sales report - Enhanced with detailed product and variant information
+const getMonthlySalesReport = async (req, res) => {
   try {
     const { month, year } = req.query;
     const reportMonth = month ? parseInt(month) - 1 : new Date().getMonth(); // 0-based month
@@ -376,54 +449,227 @@ const getMonthlyInventoryReport = async (req, res) => {
     const startOfMonth = new Date(reportYear, reportMonth, 1);
     const endOfMonth = new Date(reportYear, reportMonth + 1, 0, 23, 59, 59, 999);
 
+    console.log('Monthly Sales Report - Period:', { startOfMonth, endOfMonth });
+
+    // Get all sales orders for the month
+    const salesOrders = await SalesOrder.find({
+      orderDate: { $gte: startOfMonth, $lte: endOfMonth }
+    })
+    .populate('items.productId', 'name sku category sellingPrice unit')
+    .populate('customerId', 'name email phone')
+    .sort({ orderDate: -1 });
+
+    console.log('Found sales orders:', salesOrders.length);
+
+    // Calculate summary
+    const totalRevenue = salesOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+    const totalOrders = salesOrders.length;
+    const totalItems = salesOrders.reduce((sum, order) => 
+      sum + order.items.reduce((itemSum, item) => itemSum + (item.quantity || 0), 0), 0
+    );
+
+    // Get detailed product sales with variants
+    const productSales = {};
+    
+    salesOrders.forEach(order => {
+      order.items.forEach(item => {
+        if (!item.productId) return; // Skip items without product reference
+        
+        const productId = item.productId._id.toString();
+        const variantKey = item.variantName ? `${productId}-${item.variantName}` : productId;
+        
+        if (!productSales[variantKey]) {
+          productSales[variantKey] = {
+            productId: item.productId._id,
+            productName: item.productId.name,
+            productSku: item.productId.sku,
+            category: item.productId.category || 'Uncategorized',
+            unit: item.productId.unit || 'pcs',
+            variantName: item.variantName || 'No Variant',
+            sellingPrice: item.productId.sellingPrice || 0,
+            totalQuantity: 0,
+            totalRevenue: 0,
+            averagePrice: 0,
+            orderCount: 0,
+            orders: [] // Store individual orders for details
+          };
+        }
+        
+        productSales[variantKey].totalQuantity += item.quantity || 0;
+        productSales[variantKey].totalRevenue += item.totalPrice || 0;
+        productSales[variantKey].orderCount += 1;
+        productSales[variantKey].orders.push({
+          orderNumber: order.orderNumber,
+          orderDate: order.orderDate,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
+          customerName: order.customerId?.name || 'Unknown',
+          customerPhone: order.customerId?.phone || 'N/A',
+          status: order.status,
+          paymentStatus: order.paymentStatus
+        });
+      });
+    });
+
+    // Calculate average prices and sort
+    Object.values(productSales).forEach(product => {
+      product.averagePrice = product.totalQuantity > 0 ? product.totalRevenue / product.totalQuantity : 0;
+    });
+
+    // Sort by total quantity sold (most selling products first)
+    const topProducts = Object.values(productSales)
+      .sort((a, b) => b.totalQuantity - a.totalQuantity)
+      .slice(0, 100); // Show top 100 products for monthly
+
+    // Calculate category breakdown
+    const categoryStats = {};
+    Object.values(productSales).forEach(product => {
+      if (!categoryStats[product.category]) {
+        categoryStats[product.category] = {
+          category: product.category,
+          totalQuantity: 0,
+          totalRevenue: 0,
+          productCount: 0,
+          variants: 0
+        };
+      }
+      categoryStats[product.category].totalQuantity += product.totalQuantity;
+      categoryStats[product.category].totalRevenue += product.totalRevenue;
+      categoryStats[product.category].productCount += 1;
+      categoryStats[product.category].variants += product.variantName !== 'No Variant' ? 1 : 0;
+    });
+
+    // Calculate weekly breakdown within the month
+    const weeklySales = {};
+    salesOrders.forEach(order => {
+      const orderDate = new Date(order.orderDate);
+      const weekStart = new Date(orderDate);
+      weekStart.setDate(orderDate.getDate() - orderDate.getDay());
+      const weekKey = weekStart.toISOString().split('T')[0];
+      
+      if (!weeklySales[weekKey]) {
+        weeklySales[weekKey] = {
+          weekStart: weekKey,
+          orders: 0,
+          revenue: 0,
+          items: 0
+        };
+      }
+      weeklySales[weekKey].orders += 1;
+      weeklySales[weekKey].revenue += order.totalAmount || 0;
+      weeklySales[weekKey].items += order.items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    });
+
+    const response = {
+      period: {
+        month: reportMonth + 1,
+        year: reportYear,
+        start: startOfMonth,
+        end: endOfMonth,
+        monthName: new Date(reportYear, reportMonth).toLocaleString('default', { month: 'long' })
+      },
+      summary: {
+        totalRevenue,
+        totalOrders,
+        totalItems,
+        uniqueProducts: Object.keys(productSales).length,
+        averageOrderValue: totalOrders > 0 ? totalRevenue / totalOrders : 0
+      },
+      topProducts,
+      categoryBreakdown: Object.values(categoryStats).sort((a, b) => b.totalRevenue - a.totalRevenue),
+      weeklyBreakdown: Object.values(weeklySales).sort((a, b) => new Date(a.weekStart) - new Date(b.weekStart))
+    };
+
+    console.log('Monthly Sales Report - Response:', {
+      totalProducts: topProducts.length,
+      totalRevenue,
+      totalOrders
+    });
+
+    res.json(response);
+
+  } catch (error) {
+    console.error('Get monthly sales report error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Get monthly inventory report
+const getMonthlyInventoryReport = async (req, res) => {
+  try {
+    console.log('Monthly inventory report requested');
+    const { month, year } = req.query;
+    const reportMonth = month ? parseInt(month) - 1 : new Date().getMonth(); // 0-based month
+    const reportYear = year ? parseInt(year) : new Date().getFullYear();
+
+    const startOfMonth = new Date(reportYear, reportMonth, 1);
+    const endOfMonth = new Date(reportYear, reportMonth + 1, 0, 23, 59, 59, 999);
+
+    console.log('Date range:', { startOfMonth, endOfMonth });
+
     // Get opening stock (stock at beginning of month)
+    console.log('Getting opening stock...');
     const openingStock = await getStockSnapshot(startOfMonth);
+    console.log('Opening stock:', openingStock);
     
     // Get closing stock (current stock)
+    console.log('Getting closing stock...');
     const closingStock = await getStockSnapshot(endOfMonth);
+    console.log('Closing stock:', closingStock);
 
     // Get stock movements for the month
+    console.log('Getting stock movements...');
     const movements = await StockMovement.find({
       movementDate: { $gte: startOfMonth, $lte: endOfMonth }
     }).populate('productId', 'name sku unit sellingPrice') // costPrice removed
       .populate('warehouseId', 'name location');
+    
+    console.log('Found movements:', movements.length);
 
     // Aggregate movements by product
     const productMovements = {};
     
-    movements.forEach(movement => {
-      const productId = movement.productId._id.toString();
-      if (!productMovements[productId]) {
-        productMovements[productId] = {
-          productId: movement.productId._id,
-          productName: movement.productId.name,
-          productSku: movement.productId.sku,
-          unit: movement.productId.unit,
-          // costPrice: movement.productId.costPrice, // Commented out
-          sellingPrice: movement.productId.sellingPrice,
-          openingStock: 0,
-          stockIn: 0,
-          stockOut: 0,
-          closingStock: 0,
-          movements: []
-        };
-      }
+    if (movements && movements.length > 0) {
+      movements.forEach(movement => {
+        if (!movement.productId || !movement.warehouseId) {
+          console.log('Skipping movement with missing references:', movement);
+          return;
+        }
+        
+        const productId = movement.productId._id.toString();
+        if (!productMovements[productId]) {
+          productMovements[productId] = {
+            productId: movement.productId._id,
+            productName: movement.productId.name,
+            productSku: movement.productId.sku,
+            unit: movement.productId.unit,
+            // costPrice: movement.productId.costPrice, // Commented out
+            sellingPrice: movement.productId.sellingPrice,
+            openingStock: 0,
+            stockIn: 0,
+            stockOut: 0,
+            closingStock: 0,
+            movements: []
+          };
+        }
 
-      if (movement.movementType === 'in' || movement.movementType === 'transfer_in') {
-        productMovements[productId].stockIn += movement.quantity;
-      } else if (movement.movementType === 'out' || movement.movementType === 'transfer_out') {
-        productMovements[productId].stockOut += movement.quantity;
-      }
+        if (movement.movementType === 'in' || movement.movementType === 'transfer_in') {
+          productMovements[productId].stockIn += movement.quantity;
+        } else if (movement.movementType === 'out' || movement.movementType === 'transfer_out') {
+          productMovements[productId].stockOut += movement.quantity;
+        }
 
-      productMovements[productId].movements.push({
-        date: movement.movementDate,
-        type: movement.movementType,
-        quantity: movement.quantity,
-        warehouse: movement.warehouseId.name,
-        reference: movement.referenceType,
-        notes: movement.notes
+        productMovements[productId].movements.push({
+          date: movement.movementDate,
+          type: movement.movementType,
+          quantity: movement.quantity,
+          warehouse: movement.warehouseId.name,
+          reference: movement.referenceType,
+          notes: movement.notes
+        });
       });
-    });
+    }
 
     // Calculate opening and closing stock for each product
     for (const productId in productMovements) {
@@ -439,13 +685,15 @@ const getMonthlyInventoryReport = async (req, res) => {
 
     const report = Object.values(productMovements).sort((a, b) => a.productName.localeCompare(b.productName));
 
+    console.log('Report generated with', report.length, 'products');
+
     // Calculate totals
-    // const totalOpeningValue = report.reduce((sum, item) => sum + (item.openingStock * item.costPrice), 0); // Commented out - costPrice removed
-    // const totalClosingValue = report.reduce((sum, item) => sum + (item.closingStock * item.costPrice), 0); // Commented out - costPrice removed
+    const totalOpeningValue = report.reduce((sum, item) => sum + (item.openingStock * (item.sellingPrice || 0)), 0);
+    const totalClosingValue = report.reduce((sum, item) => sum + (item.closingStock * (item.sellingPrice || 0)), 0);
     const totalStockIn = report.reduce((sum, item) => sum + item.stockIn, 0);
     const totalStockOut = report.reduce((sum, item) => sum + item.stockOut, 0);
 
-    res.json({
+    const response = {
       period: {
         month: reportMonth + 1,
         year: reportYear,
@@ -454,14 +702,17 @@ const getMonthlyInventoryReport = async (req, res) => {
       },
       summary: {
         totalProducts: report.length,
-        // totalOpeningValue, // Commented out - costPrice removed
-        // totalClosingValue, // Commented out - costPrice removed
+        totalOpeningValue,
+        totalClosingValue,
         totalStockIn,
         totalStockOut,
         netChange: totalStockIn - totalStockOut
       },
       inventory: report
-    });
+    };
+
+    console.log('Sending response:', response);
+    res.json(response);
 
   } catch (error) {
     console.error('Get monthly inventory report error:', error);
@@ -471,37 +722,42 @@ const getMonthlyInventoryReport = async (req, res) => {
 
 // Helper function to get stock snapshot at a specific date
 const getStockSnapshot = async (date) => {
-  const warehouses = await Warehouse.find({});
-  const stockSnapshot = {};
+  try {
+    const warehouses = await Warehouse.find({});
+    const stockSnapshot = {};
 
-  for (const warehouse of warehouses) {
-    for (const stockItem of warehouse.currentStock) {
-      const productId = stockItem.productId.toString();
-      
-      // Get movements after this date to calculate what the stock was at that time
-      const movementsAfter = await StockMovement.find({
-        productId: stockItem.productId,
-        warehouseId: warehouse._id,
-        movementDate: { $gt: date }
-      });
+    for (const warehouse of warehouses) {
+      for (const stockItem of warehouse.currentStock) {
+        const productId = stockItem.productId.toString();
+        
+        // Get movements after this date to calculate what the stock was at that time
+        const movementsAfter = await StockMovement.find({
+          productId: stockItem.productId,
+          warehouseId: warehouse._id,
+          movementDate: { $gt: date }
+        });
 
-      let stockAtDate = stockItem.quantity;
-      movementsAfter.forEach(movement => {
-        if (movement.movementType === 'in' || movement.movementType === 'transfer_in') {
-          stockAtDate -= movement.quantity;
-        } else if (movement.movementType === 'out' || movement.movementType === 'transfer_out') {
-          stockAtDate += movement.quantity;
+        let stockAtDate = stockItem.quantity;
+        movementsAfter.forEach(movement => {
+          if (movement.movementType === 'in' || movement.movementType === 'transfer_in') {
+            stockAtDate -= movement.quantity;
+          } else if (movement.movementType === 'out' || movement.movementType === 'transfer_out') {
+            stockAtDate += movement.quantity;
+          }
+        });
+
+        if (!stockSnapshot[productId]) {
+          stockSnapshot[productId] = 0;
         }
-      });
-
-      if (!stockSnapshot[productId]) {
-        stockSnapshot[productId] = 0;
+        stockSnapshot[productId] += Math.max(0, stockAtDate);
       }
-      stockSnapshot[productId] += Math.max(0, stockAtDate);
     }
-  }
 
-  return stockSnapshot;
+    return stockSnapshot;
+  } catch (error) {
+    console.error('Error in getStockSnapshot:', error);
+    return {};
+  }
 };
 
 // Get supplier performance report
@@ -700,6 +956,7 @@ module.exports = {
   getMainDashboardReport,
   getDailyStockReport,
   getWeeklySalesReport,
+  getMonthlySalesReport,
   getMonthlyInventoryReport,
   getSupplierPerformanceReport,
   getReturnAnalysisReport

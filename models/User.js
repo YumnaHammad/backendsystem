@@ -2,12 +2,80 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
-  firstName: String,
-  lastName: String,
-  email: { type: String, unique: true },
-  password: String,
-  role: { type: String, default: 'employee' },
-  isActive: { type: Boolean, default: true },
+  firstName: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  lastName: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  email: { 
+    type: String, 
+    unique: true,
+    required: true,
+    lowercase: true,
+    trim: true
+  },
+  password: {
+    type: String,
+    required: true
+  },
+  role: { 
+    type: String, 
+    enum: ['admin', 'manager', 'employee'],
+    default: 'employee' 
+  },
+  isActive: { 
+    type: Boolean, 
+    default: true 
+  },
+  phone: {
+    type: String,
+    trim: true
+  },
+  department: {
+    type: String,
+    trim: true
+  },
+  position: {
+    type: String,
+    trim: true
+  },
+  employeeId: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
+  lastLogin: {
+    type: Date
+  },
+  loginCount: {
+    type: Number,
+    default: 0
+  },
+  address: {
+    street: String,
+    city: String,
+    state: String,
+    zipCode: String,
+    country: String
+  },
+  emergencyContact: {
+    name: String,
+    relationship: String,
+    phone: String
+  },
+  hireDate: {
+    type: Date
+  },
+  notes: {
+    type: String
+  }
+}, {
+  timestamps: true
 });
 
 // ✅ Hash password automatically before saving

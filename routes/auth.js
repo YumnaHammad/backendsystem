@@ -62,13 +62,25 @@ router.get('/users', async (req, res) => {
     res.json({ 
       count: users.length,
       users: users.map(u => ({
+        _id: u._id,
         id: u._id,
         firstName: u.firstName,
         lastName: u.lastName,
         email: u.email,
         role: u.role,
         isActive: u.isActive,
-        createdAt: u.createdAt
+        phone: u.phone,
+        department: u.department,
+        position: u.position,
+        employeeId: u.employeeId,
+        lastLogin: u.lastLogin,
+        loginCount: u.loginCount,
+        address: u.address,
+        emergencyContact: u.emergencyContact,
+        hireDate: u.hireDate,
+        notes: u.notes,
+        createdAt: u.createdAt,
+        updatedAt: u.updatedAt
       }))
     });
   } catch (error) {
