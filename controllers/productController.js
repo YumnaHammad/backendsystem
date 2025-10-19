@@ -201,17 +201,23 @@ const createProduct = async (req, res) => {
   try {
     const productData = req.body;
     
-    // Generate unique SKU if not provided or if "Generate" was clicked
-    if (!productData.sku || productData.generateSku) {
+    // Generate unique SKU if not provided and no variants
+    if (!productData.sku && (!productData.hasVariants || !productData.variants || productData.variants.length === 0)) {
       productData.sku = await generateUniqueSKU(productData.name);
     }
     
-    // Check if SKU already exists
-    const existingProduct = await Product.findOne({ sku: productData.sku });
-    if (existingProduct) {
-      return res.status(400).json({ error: 'SKU already exists' });
+    // Remove empty variants array to avoid index issues
+    if (productData.variants && Array.isArray(productData.variants) && productData.variants.length === 0) {
+      delete productData.variants;
+    }
+    
+    // If hasVariants is false, ensure variants is not set
+    if (productData.hasVariants === false || productData.hasVariants === 'false') {
+      delete productData.variants;
+      productData.hasVariants = false;
     }
 
+    // No need to manually check if SKU exists - MongoDB unique constraint will handle it
     const product = await Product.create(productData);
     
     // Create audit log (only if user is authenticated)
