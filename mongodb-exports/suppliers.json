@@ -1,0 +1,61 @@
+[
+  {
+    "_id": "68e4e2e7b6de3ca13a7ed6aa",
+    "name": "Ahmed Khan",
+    "company": "Global Supplies Ltd",
+    "email": "ahmed@globalsupplies.com",
+    "phone": "+92-300-1234567",
+    "address": {
+      "street": "123 Industrial Area",
+      "city": "Karachi",
+      "state": "Sindh",
+      "zipCode": "75000",
+      "country": "Pakistan"
+    },
+    "supplierCode": "SUP-001",
+    "paymentTerms": "net30",
+    "isActive": true,
+    "createdAt": "2025-10-07T09:52:39.754Z",
+    "updatedAt": "2025-10-07T09:52:39.754Z",
+    "__v": 0
+  },
+  {
+    "_id": "68e6d407ae4cb5c004e61f87",
+    "name": "Abdullah",
+    "companyName": "bussiness",
+    "email": "yumnahammad4884@gmail.com",
+    "phone": "04465465464",
+    "website": "",
+    "address": {
+      "street": "",
+      "city": "",
+      "state": "",
+      "country": "",
+      "postalCode": ""
+    },
+    "contactPerson": {
+      "name": "Abdullah",
+      "position": "maanger",
+      "email": "",
+      "phone": ""
+    },
+    "paymentTerms": "Net 30",
+    "creditLimit": 0,
+    "currentBalance": 0,
+    "rating": 5,
+    "deliveryTime": {
+      "reliability": "Good"
+    },
+    "qualityRating": "Good",
+    "categories": [],
+    "status": "Active",
+    "isPreferred": false,
+    "notes": "",
+    "totalPurchases": 0,
+    "totalSpent": 0,
+    "averageOrderValue": 0,
+    "createdAt": "2025-10-08T21:13:43.240Z",
+    "updatedAt": "2025-10-08T21:13:43.258Z",
+    "__v": 0
+  }
+]

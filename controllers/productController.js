@@ -1,7 +1,8 @@
 const { Product, Warehouse, AuditLog } = require('../models');
 const { createAuditLog } = require('../middleware/audit');
+const { nanoid } = require('nanoid');
 
-// Generate unique SKU based on product name
+// Generate unique SKU based on product name with guaranteed uniqueness
 const generateUniqueSKU = async (productName) => {
   if (!productName) {
     throw new Error('Product name is required to generate SKU');
@@ -12,44 +13,53 @@ const generateUniqueSKU = async (productName) => {
     .toUpperCase()
     .replace(/[^A-Z0-9\s]/g, '') // Remove special characters
     .replace(/\s+/g, '') // Remove spaces
-    .substring(0, 8); // Limit to 8 characters
+    .substring(0, 6); // Limit to 6 characters for better readability
   
   // Ensure we have at least some characters
   if (cleanName.length === 0) {
     throw new Error('Product name must contain at least one alphanumeric character');
   }
   
-  // Add timestamp suffix for uniqueness
-  const timestamp = Date.now().toString().slice(-4); // Last 4 digits of timestamp
-  const baseSKU = `${cleanName}${timestamp}`;
-  
-  // Check if SKU already exists, if so, add incremental number
-  let sku = baseSKU;
-  let counter = 1;
+  // Generate unique SKU with multiple fallback strategies
+  let sku;
   let attempts = 0;
-  const maxAttempts = 1000; // Prevent infinite loop
+  const maxAttempts = 50;
   
-  while (await Product.findOne({ sku })) {
+  while (attempts < maxAttempts) {
+    // Strategy 1: Use product name + nanoid (most unique)
+    const uniqueId = nanoid(6).toUpperCase();
+    sku = `${cleanName}${uniqueId}`;
+    
+    // Check if SKU already exists
+    const existingProduct = await Product.findOne({ sku });
+    
+    if (!existingProduct) {
+      return sku; // Found unique SKU!
+    }
+    
     attempts++;
-    if (attempts > maxAttempts) {
-      // If we've tried too many times, use a completely random suffix
-      const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
-      sku = `${cleanName}${randomSuffix}`;
-      break;
-    }
     
-    // Try different formats for uniqueness
-    if (counter <= 99) {
-      sku = `${cleanName}${timestamp}${counter.toString().padStart(2, '0')}`;
-    } else if (counter <= 999) {
-      sku = `${cleanName}${timestamp}${counter.toString().padStart(3, '0')}`;
-    } else {
-      // Use longer timestamp if needed
-      const longTimestamp = Date.now().toString().slice(-6);
-      sku = `${cleanName}${longTimestamp}${counter.toString().padStart(2, '0')}`;
+    // If we've tried many times, add a counter
+    if (attempts > 10) {
+      const counter = (attempts - 10).toString().padStart(3, '0');
+      sku = `${cleanName}${uniqueId}${counter}`;
+      const existingProduct2 = await Product.findOne({ sku });
+      if (!existingProduct2) {
+        return sku;
+      }
     }
-    
-    counter++;
+  }
+  
+  // Last resort: completely random SKU
+  const randomSuffix = nanoid(8).toUpperCase();
+  sku = `${cleanName}${randomSuffix}`;
+  
+  // Final check
+  const existingProduct = await Product.findOne({ sku });
+  if (existingProduct) {
+    // If still exists, add timestamp
+    const timestamp = Date.now().toString().slice(-6);
+    sku = `${cleanName}${timestamp}${nanoid(4).toUpperCase()}`;
   }
   
   return sku;
@@ -201,10 +211,10 @@ const createProduct = async (req, res) => {
   try {
     const productData = req.body;
     
-    // Generate unique SKU if not provided and no variants
-    if (!productData.sku && (!productData.hasVariants || !productData.variants || productData.variants.length === 0)) {
-      productData.sku = await generateUniqueSKU(productData.name);
-    }
+    // Determine if product has variants
+    const hasVariants = productData.hasVariants === true || 
+                       productData.hasVariants === 'true' ||
+                       (productData.variants && productData.variants.length > 0);
     
     // Remove empty variants array to avoid index issues
     if (productData.variants && Array.isArray(productData.variants) && productData.variants.length === 0) {
@@ -212,12 +222,30 @@ const createProduct = async (req, res) => {
     }
     
     // If hasVariants is false, ensure variants is not set
-    if (productData.hasVariants === false || productData.hasVariants === 'false') {
+    if (!hasVariants) {
       delete productData.variants;
       productData.hasVariants = false;
+      
+      // ALWAYS generate SKU for non-variant products
+      if (!productData.sku) {
+        console.log('Generating SKU for product:', productData.name);
+        productData.sku = await generateUniqueSKU(productData.name);
+        console.log('Generated SKU:', productData.sku);
+      }
+    } else {
+      // Product has variants - no base SKU needed
+      productData.hasVariants = true;
+      delete productData.sku; // Remove SKU for variant products
     }
 
-    // No need to manually check if SKU exists - MongoDB unique constraint will handle it
+    console.log('Creating product with data:', {
+      name: productData.name,
+      sku: productData.sku,
+      hasVariants: productData.hasVariants,
+      variantsCount: productData.variants ? productData.variants.length : 0
+    });
+
+    // Create the product
     const product = await Product.create(productData);
     
     // Create audit log (only if user is authenticated)
@@ -238,10 +266,29 @@ const createProduct = async (req, res) => {
     res.status(201).json(product);
   } catch (error) {
     console.error('Create product error:', error);
+    
+    // Handle duplicate SKU error
     if (error.code === 11000) {
-      return res.status(400).json({ error: 'SKU already exists' });
+      const field = error.keyPattern ? Object.keys(error.keyPattern)[0] : 'field';
+      return res.status(400).json({ 
+        error: `${field === 'sku' ? 'SKU' : field} already exists. This is unexpected - please try again.`,
+        details: 'The system will generate a new unique SKU on retry.'
+      });
     }
-    res.status(500).json({ error: 'Internal server error' });
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(e => e.message);
+      return res.status(400).json({ 
+        error: 'Validation error',
+        details: messages.join(', ')
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'Failed to create product',
+      details: error.message 
+    });
   }
 };
 

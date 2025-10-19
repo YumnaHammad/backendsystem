@@ -8,8 +8,12 @@ const productSchema = new mongoose.Schema({
   },
   sku: {
     type: String,
-    required: true,
+    required: function() {
+      // SKU is required only if product has no variants
+      return !this.hasVariants;
+    },
     unique: true,
+    sparse: true, // Allow null values in unique index
     trim: true,
     uppercase: true
   },
@@ -102,8 +106,8 @@ const productSchema = new mongoose.Schema({
 });
 
 // Index for efficient searching
-productSchema.index({ sku: 1 }, { unique: true }); // Ensure unique SKU at database level
-productSchema.index({ 'variants.sku': 1 }); // Index for variant SKUs (for quick lookup)
+productSchema.index({ sku: 1 }, { unique: true, sparse: true }); // Ensure unique SKU at database level
+productSchema.index({ 'variants.sku': 1 }, { sparse: true }); // Index for variant SKUs (sparse to allow nulls)
 productSchema.index({ name: 1 });
 productSchema.index({ category: 1 });
 

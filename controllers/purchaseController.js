@@ -141,8 +141,25 @@ const createPurchase = async (req, res) => {
 
     await purchase.save();
 
-    // NOTE: Stock will ONLY be added to warehouse when payment status is marked as "paid"
-    // This ensures inventory accuracy and proper payment tracking
+    // Add stock to warehouse IMMEDIATELY when purchase is created
+    console.log('Adding stock to warehouse for purchase:', purchase.purchaseNumber);
+    await purchase.updateStockAfterPayment();
+    
+    // Also update product variant stock
+    console.log('Updating product variant stock...');
+    for (const item of purchase.items) {
+      const product = await Product.findById(item.productId);
+      if (product && product.hasVariants && product.variants && item.variantId) {
+        const variant = product.variants.find(v => 
+          v._id?.toString() === item.variantId || v.sku === item.variantId
+        );
+        if (variant) {
+          variant.stock = (variant.stock || 0) + item.quantity;
+          console.log(`Updated variant ${variant.name}: ${variant.stock} units`);
+          await product.save();
+        }
+      }
+    }
     
     // Audit log will be created by middleware
 
@@ -154,8 +171,9 @@ const createPurchase = async (req, res) => {
     ]);
 
     res.status(201).json({
-      message: 'Purchase order created successfully. Stock will be added after payment is marked as paid.',
-      purchase
+      message: 'Purchase order created successfully. Stock added to warehouse immediately.',
+      purchase,
+      stockAdded: true
     });
 
   } catch (error) {
@@ -315,8 +333,8 @@ const generateReceipt = async (req, res) => {
     purchase.paymentDate = new Date();
     purchase.receiptNumber = receipt.receiptNumber;
     
-    // Add stock to warehouse now that payment is cleared
-    await purchase.updateStockAfterPayment();
+    // NOTE: Stock is already added when purchase is created
+    // No need to add stock again when generating receipt
 
     await purchase.save();
 
@@ -339,10 +357,10 @@ const generateReceipt = async (req, res) => {
     }
 
     res.json({
-      message: 'Payment marked as paid. Receipt generated and stock added to warehouse successfully.',
+      message: 'Payment marked as paid. Receipt generated successfully.',
       receipt,
       purchase,
-      stockAdded: true
+      note: 'Stock was already added when purchase order was created'
     });
 
   } catch (error) {
@@ -398,14 +416,18 @@ const markPaymentCleared = async (req, res) => {
       return res.status(400).json({ error: 'Payment already cleared' });
     }
     
-    // Mark payment as cleared and update stock
-    await purchase.markPaymentCleared();
+    // Mark payment as cleared (stock already added when purchase was created)
+    purchase.paymentStatus = 'paid';
+    purchase.paymentDate = new Date();
+    await purchase.generateReceipt();
+    await purchase.save();
     
     res.json({
       success: true,
-      message: 'Payment cleared and stock updated successfully',
+      message: 'Payment cleared successfully',
       receiptNumber: purchase.receiptNumber,
-      purchase: purchase
+      purchase: purchase,
+      note: 'Stock was already added when purchase order was created'
     });
   } catch (error) {
     console.error('Mark payment cleared error:', error);

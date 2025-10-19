@@ -1,0 +1,94 @@
+[
+  {
+    "_id": "68e4e2e7b6de3ca13a7ed6b1",
+    "email": "admin@example.com",
+    "password": "$2a$10$v1T.FAXWQhpM/w2/.W7lVexA12S8Iw.g3Or/Y1Pi.hkt7RwKY4Ndq",
+    "firstName": "System",
+    "lastName": "Administrator",
+    "role": "admin",
+    "isActive": true,
+    "createdAt": "2025-10-07T09:52:39.830Z",
+    "updatedAt": "2025-10-07T09:52:39.830Z",
+    "__v": 0
+  },
+  {
+    "_id": "68e4ed43baefc087a5b169e6",
+    "firstName": "System",
+    "lastName": "Administrator",
+    "email": "admi@example.com",
+    "password": "$2a$10$x3ILIeCvDahzS3zfOvTJF.vnbpkH/W1MP9a/Tw0wQ7dYVa1fa5XpG",
+    "role": "admin",
+    "isActive": true,
+    "__v": 0
+  },
+  {
+    "_id": "68e64fb792fad597c75194d5",
+    "firstName": "Nisha",
+    "lastName": "fatima",
+    "email": "shahzadqadirmalik@gmail.com",
+    "password": "$2a$10$K6EEyr9DOK7xzyRiAK7W8.DxwC0S/QyYyeI/OEXkcMSnATynlF2oK",
+    "role": "manager",
+    "isActive": true,
+    "__v": 0
+  },
+  {
+    "_id": "68e6695a54e9e31a455af5a6",
+    "firstName": "ayesha",
+    "lastName": "Hammad",
+    "email": "doctordriving1122@gmail.com",
+    "password": "$2a$10$ikBxAJ6hdaDb.rY3R1Yw9OI28rC8r1rDPp70IXCfSQuuccHkEZinO",
+    "role": "user",
+    "isActive": true,
+    "__v": 0
+  },
+  {
+    "_id": "68ea617d448c6c78ceb24ff1",
+    "firstName": "Test",
+    "lastName": "User",
+    "email": "testuser@example.com",
+    "password": "$2a$10$atObGBMwUNrJniDoNXWbt.y94oj.CshmhD.EGS84qeRdAKmnzNtxS",
+    "role": "employee",
+    "isActive": true,
+    "__v": 0
+  },
+  {
+    "_id": "68ebf799d7e4dd9071d5a951",
+    "firstName": "Admin",
+    "lastName": "Hammad",
+    "email": "yumnahammad4884@gmail.com",
+    "password": "$2a$10$qpLeS30lOf4Jsrtxn9KR0OigPN11BmQhDLsFY8xAMB8LDnZYBMfoC",
+    "role": "manager",
+    "isActive": true,
+    "__v": 0
+  },
+  {
+    "_id": "68ebf8a8d7e4dd9071d5aad9",
+    "firstName": "Yumna",
+    "lastName": "Hammad",
+    "email": "manager@example.com",
+    "password": "$2a$10$ChXnZp0uJAbsfBOKCNf6k.6.sKBZ2utCUytiBc922flQgTVQdPXAi",
+    "role": "manager",
+    "isActive": true,
+    "__v": 0
+  },
+  {
+    "_id": "68ec8e103cb40bb19b1b8ecf",
+    "firstName": "yumna",
+    "lastName": "Hammad",
+    "email": "yumna4884@gmail.com",
+    "password": "$2a$10$603CSFeP33JE56f6WbRimuWwx6GgUbzUMuLIAzwJGKyAVdaYf2zlG",
+    "role": "manager",
+    "isActive": true,
+    "__v": 0
+  },
+  {
+    "_id": "68ec988279cd2a07e80e4450",
+    "firstName": "Ayesha",
+    "lastName": "iqbal",
+    "email": "manager@gmail.com",
+    "password": "$2a$10$u.zJPrSok4cUYAU3Lr41ceQotBY/onKD4WAOJ/2JCwehrualLjgg6",
+    "role": "manager",
+    "isActive": true,
+    "__v": 0
+  }
+]

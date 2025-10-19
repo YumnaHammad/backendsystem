@@ -34,7 +34,7 @@ async function seedFreshData() {
       role: 'manager',
       isActive: true
     });
-    await managerUser.save();
+    await managerUser.save();c backend
     console.log('✅ Manager user created');
     console.log('   Email: manager@example.com');
     console.log('   Password: ManagerPass123\n');

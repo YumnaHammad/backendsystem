@@ -1,0 +1,86 @@
+{
+  "exportDate": "2025-10-19T19:33:14.640Z",
+  "mongodbUri": "mongodb+srv://inventory:leader12@cluster0.earrfsb.mongodb.net/",
+  "collections": [
+    {
+      "collection": "users",
+      "count": 9,
+      "fileName": "C:\\Users\\XPRISTO\\Desktop\\Inventory\\backend\\mongodb-exports\\users.json"
+    },
+    {
+      "collection": "products",
+      "count": 0,
+      "fileName": "C:\\Users\\XPRISTO\\Desktop\\Inventory\\backend\\mongodb-exports\\products.json"
+    },
+    {
+      "collection": "warehouses",
+      "count": 8,
+      "fileName": "C:\\Users\\XPRISTO\\Desktop\\Inventory\\backend\\mongodb-exports\\warehouses.json"
+    },
+    {
+      "collection": "suppliers",
+      "count": 2,
+      "fileName": "C:\\Users\\XPRISTO\\Desktop\\Inventory\\backend\\mongodb-exports\\suppliers.json"
+    },
+    {
+      "collection": "customers",
+      "count": 0,
+      "fileName": "C:\\Users\\XPRISTO\\Desktop\\Inventory\\backend\\mongodb-exports\\customers.json"
+    },
+    {
+      "collection": "purchases",
+      "count": 31,
+      "fileName": "C:\\Users\\XPRISTO\\Desktop\\Inventory\\backend\\mongodb-exports\\purchases.json"
+    },
+    {
+      "collection": "invoices",
+      "count": 3,
+      "fileName": "C:\\Users\\XPRISTO\\Desktop\\Inventory\\backend\\mongodb-exports\\invoices.json"
+    },
+    {
+      "collection": "receipts",
+      "count": 3,
+      "fileName": "C:\\Users\\XPRISTO\\Desktop\\Inventory\\backend\\mongodb-exports\\receipts.json"
+    },
+    {
+      "collection": "salesorders",
+      "count": 15,
+      "fileName": "C:\\Users\\XPRISTO\\Desktop\\Inventory\\backend\\mongodb-exports\\salesorders.json"
+    },
+    {
+      "collection": "salesshipments",
+      "count": 2,
+      "fileName": "C:\\Users\\XPRISTO\\Desktop\\Inventory\\backend\\mongodb-exports\\salesshipments.json"
+    },
+    {
+      "collection": "returns",
+      "count": 1,
+      "fileName": "C:\\Users\\XPRISTO\\Desktop\\Inventory\\backend\\mongodb-exports\\returns.json"
+    },
+    {
+      "collection": "stockmovements",
+      "count": 32,
+      "fileName": "C:\\Users\\XPRISTO\\Desktop\\Inventory\\backend\\mongodb-exports\\stockmovements.json"
+    },
+    {
+      "collection": "stockalerts",
+      "count": 0,
+      "fileName": "C:\\Users\\XPRISTO\\Desktop\\Inventory\\backend\\mongodb-exports\\stockalerts.json"
+    },
+    {
+      "collection": "reports",
+      "count": 0,
+      "fileName": "C:\\Users\\XPRISTO\\Desktop\\Inventory\\backend\\mongodb-exports\\reports.json"
+    },
+    {
+      "collection": "auditlogs",
+      "count": 1,
+      "fileName": "C:\\Users\\XPRISTO\\Desktop\\Inventory\\backend\\mongodb-exports\\auditlogs.json"
+    },
+    {
+      "collection": "expectedreturns",
+      "count": 0,
+      "fileName": "C:\\Users\\XPRISTO\\Desktop\\Inventory\\backend\\mongodb-exports\\expectedreturns.json"
+    }
+  ]
+}

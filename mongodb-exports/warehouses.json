@@ -1,0 +1,269 @@
+[
+  {
+    "_id": "68e4e2e6b6de3ca13a7ed680",
+    "name": "Central Warehouse",
+    "location": "Karachi, Pakistan",
+    "capacity": 1000,
+    "isActive": true,
+    "createdAt": "2025-10-01T04:00:00.000Z",
+    "currentStock": [
+      {
+        "productId": "68e4e2e8b6de3ca13a7ed6bc",
+        "quantity": 40,
+        "reservedQuantity": 0,
+        "tags": [],
+        "_id": "68e4e2e8b6de3ca13a7ed6ca"
+      },
+      {
+        "productId": "68e4e2e8b6de3ca13a7ed6bf",
+        "quantity": 251,
+        "reservedQuantity": 0,
+        "tags": [
+          "returned"
+        ],
+        "_id": "68e4e2e9b6de3ca13a7ed6d5",
+        "returnedAt": "2025-10-07T09:52:42.672Z"
+      },
+      {
+        "productId": "68e4e2e8b6de3ca13a7ed6c1",
+        "quantity": 1524,
+        "reservedQuantity": 0,
+        "tags": [],
+        "_id": "68e4e2eab6de3ca13a7ed6f9"
+      },
+      {
+        "productId": "68e61b6243bc3a372b8ab3d0",
+        "quantity": 2,
+        "reservedQuantity": 0,
+        "tags": [],
+        "_id": "68e61dcb42f01fdfe4a78b67"
+      },
+      {
+        "productId": "68e6722454e9e31a455afb8c",
+        "quantity": 200,
+        "reservedQuantity": 0,
+        "tags": [],
+        "_id": "68e672bd54e9e31a455afccf"
+      },
+      {
+        "productId": "68e4e2e8b6de3ca13a7ed6bf",
+        "quantity": 11,
+        "reservedQuantity": 0,
+        "tags": [],
+        "_id": "68e98a614478cc5d15f8a5f3"
+      },
+      {
+        "productId": "68e582219572a6850ac0300f",
+        "quantity": 90,
+        "reservedQuantity": 0,
+        "tags": [],
+        "_id": "68e98a874478cc5d15f8a695"
+      },
+      {
+        "productId": "68e582219572a6850ac0300f",
+        "quantity": 90,
+        "reservedQuantity": 0,
+        "tags": [],
+        "_id": "68e98aa74478cc5d15f8a6dc"
+      },
+      {
+        "productId": "68e4e2e8b6de3ca13a7ed6c1",
+        "quantity": 10,
+        "reservedQuantity": 0,
+        "tags": [],
+        "_id": "68e991010576be1e6565f33b"
+      },
+      {
+        "productId": "68e4e2e8b6de3ca13a7ed6c1",
+        "quantity": 10,
+        "reservedQuantity": 0,
+        "tags": [],
+        "_id": "68e996703df048b0cbd732e5"
+      },
+      {
+        "productId": "68e4e2e8b6de3ca13a7ed6bf",
+        "quantity": 1,
+        "reservedQuantity": 0,
+        "tags": [],
+        "_id": "68ea85fabda1767c222ce41d"
+      },
+      {
+        "productId": "68eb84e91f2ab1084e8e7817",
+        "quantity": 200,
+        "reservedQuantity": 0,
+        "tags": [],
+        "_id": "68ebbca0bbde4bb496507bbf"
+      },
+      {
+        "productId": "68eb84e91f2ab1084e8e7817",
+        "quantity": 100,
+        "reservedQuantity": 0,
+        "tags": [],
+        "_id": "68ebfadcb58a6dfc084a31ec"
+      },
+      {
+        "productId": "68ec2c71c7ed161ae0fc52e3",
+        "quantity": 26,
+        "reservedQuantity": 0,
+        "tags": [],
+        "_id": "68ec2cbcc7ed161ae0fc556a"
+      },
+      {
+        "productId": "68ec355ee780a669008f3a60",
+        "quantity": 22,
+        "reservedQuantity": 0,
+        "tags": [],
+        "_id": "68ec3fba9bf6ae7a8e161d6d"
+      },
+      {
+        "productId": "68eca80d2b1c5bea9ca98c4a",
+        "quantity": 10,
+        "reservedQuantity": 0,
+        "tags": [],
+        "_id": "68eca9a51393b012503b5352"
+      },
+      {
+        "productId": "68eca80d2b1c5bea9ca98c4a",
+        "quantity": 10,
+        "reservedQuantity": 0,
+        "tags": [],
+        "_id": "68eca9db1393b012503b53c9"
+      }
+    ],
+    "updatedAt": "2025-10-13T07:27:23.241Z",
+    "__v": 18
+  },
+  {
+    "_id": "68e4eb0bb461c3395db53e0b",
+    "name": "mainn",
+    "location": "New York",
+    "capacity": 10000,
+    "isActive": true,
+    "createdBy": "68e4e2e7b6de3ca13a7ed6b1",
+    "currentStock": [
+      {
+        "productId": "68e4e2e8b6de3ca13a7ed6bc",
+        "quantity": 120,
+        "reservedQuantity": 0,
+        "tags": [],
+        "_id": "68e4ecb362fbdca767730ada"
+      },
+      {
+        "productId": "68e4e2e8b6de3ca13a7ed6bf",
+        "quantity": 105,
+        "reservedQuantity": 0,
+        "tags": [
+          "returned"
+        ],
+        "returnedAt": "2025-10-07T10:39:44.327Z",
+        "_id": "68e4ecb362fbdca767730adc"
+      },
+      {
+        "productId": "68e4e2e8b6de3ca13a7ed6c1",
+        "quantity": 300,
+        "reservedQuantity": 0,
+        "tags": [],
+        "_id": "68e4ecb362fbdca767730ade"
+      }
+    ],
+    "createdAt": "2025-10-07T10:27:23.869Z",
+    "updatedAt": "2025-10-07T10:39:44.435Z",
+    "__v": 3
+  },
+  {
+    "_id": "68e661e454e9e31a455ae5bc",
+    "name": "ware",
+    "location": "leader bpo office",
+    "capacity": 2300,
+    "isActive": true,
+    "currentStock": [
+      {
+        "productId": "68e6722454e9e31a455afb8c",
+        "quantity": 89,
+        "reservedQuantity": 0,
+        "tags": [
+          "returned"
+        ],
+        "returnedAt": "2025-10-10T21:43:00.874Z",
+        "_id": "68e97de4a21336ac2b058db8"
+      }
+    ],
+    "createdAt": "2025-10-08T13:06:44.498Z",
+    "updatedAt": "2025-10-10T21:43:00.888Z",
+    "__v": 1
+  },
+  {
+    "_id": "68eac4c4dbfc3e63d0a759cd",
+    "name": "Tester",
+    "location": "asdas",
+    "capacity": 1230,
+    "isActive": true,
+    "currentStock": [],
+    "createdAt": "2025-10-11T20:57:40.661Z",
+    "updatedAt": "2025-10-11T20:57:40.661Z",
+    "__v": 0
+  },
+  {
+    "_id": "68eac73e2cb1537aa83610f1",
+    "name": "zahid",
+    "location": "New York",
+    "capacity": 10000,
+    "isActive": true,
+    "currentStock": [],
+    "createdAt": "2025-10-11T21:08:14.513Z",
+    "updatedAt": "2025-10-11T21:08:14.513Z",
+    "__v": 0
+  },
+  {
+    "_id": "68eb5562398b9a8fbc8358c0",
+    "name": "Third Floor",
+    "location": "Leader BPO",
+    "capacity": 2500,
+    "isActive": true,
+    "currentStock": [],
+    "createdAt": "2025-10-12T07:14:42.065Z",
+    "updatedAt": "2025-10-12T07:14:42.065Z",
+    "__v": 0
+  },
+  {
+    "_id": "68eb614078af67a789caff79",
+    "name": "second",
+    "location": "pakistan",
+    "capacity": 2398,
+    "isActive": true,
+    "currentStock": [
+      {
+        "productId": "68e4e2e8b6de3ca13a7ed6c1",
+        "quantity": 230,
+        "reservedQuantity": 0,
+        "tags": [
+          "returned"
+        ],
+        "returnedAt": "2025-10-12T12:54:20.548Z",
+        "_id": "68eba4fc781a4aae613beafb"
+      }
+    ],
+    "createdAt": "2025-10-12T08:05:20.317Z",
+    "updatedAt": "2025-10-12T12:54:20.586Z",
+    "__v": 1
+  },
+  {
+    "_id": "68eb837da9ed11bfacead913",
+    "name": "Warehouse",
+    "location": "Satellite Town",
+    "capacity": 3200,
+    "isActive": true,
+    "currentStock": [
+      {
+        "productId": "68eb84e91f2ab1084e8e7817",
+        "quantity": 25,
+        "reservedQuantity": 0,
+        "tags": [],
+        "_id": "68eb86cb5e55593a0c0209be"
+      }
+    ],
+    "createdAt": "2025-10-12T10:31:25.375Z",
+    "updatedAt": "2025-10-12T11:09:29.506Z",
+    "__v": 1
+  }
+]
