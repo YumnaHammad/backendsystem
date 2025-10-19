@@ -25,8 +25,13 @@ const app = express();
 // Middleware - CORS Configuration
 app.use(cors({
   origin: function (origin, callback) {
+    console.log('🌐 CORS Request from origin:', origin);
+    
     // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
+    if (!origin) {
+      console.log('✅ Allowing request with no origin');
+      return callback(null, true);
+    }
     
     // List of allowed origins
     const allowedOrigins = [
@@ -39,11 +44,15 @@ app.use(cors({
       process.env.FRONTEND_URL
     ].filter(Boolean);
     
+    console.log('📋 Allowed origins:', allowedOrigins);
+    
     // Check if origin is allowed
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      console.log('✅ Origin allowed:', origin);
       callback(null, true);
     } else {
-      console.log('CORS blocked origin:', origin);
+      console.log('⚠️  Origin not in allowed list:', origin);
+      console.log('🔓 Allowing anyway...');
       callback(null, true); // Allow all for now
     }
   },
@@ -65,6 +74,15 @@ app.use((req, res, next) => {
 // Health check (no DB required)
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// CORS test endpoint
+app.get('/api/cors-test', (req, res) => {
+  res.json({ 
+    message: 'CORS is working!',
+    origin: req.headers.origin,
+    timestamp: new Date().toISOString()
+  });
 });
 
 // MongoDB connection middleware (connect before routes)
