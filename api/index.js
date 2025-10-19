@@ -22,12 +22,35 @@ const cityReportRoutes = require('../routes/cityReports');
 
 const app = express();
 
-// Middleware
+// Middleware - CORS Configuration
 app.use(cors({
-  origin: true, // Allow all origins for Vercel
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // List of allowed origins
+    const allowedOrigins = [
+      'https://inventory-system-nine-xi.vercel.app',
+      'https://inventory-system-nine-xi.vercel.app/',
+      'https://inventory-system-beta-smoky.vercel.app',
+      'http://localhost:3001',
+      'http://localhost:3002',
+      'http://localhost:5173',
+      process.env.FRONTEND_URL
+    ].filter(Boolean);
+    
+    // Check if origin is allowed
+    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      callback(null, true); // Allow all for now
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true,
+  optionsSuccessStatus: 200 // For legacy browser support
 }));
 
 app.use(express.json());
