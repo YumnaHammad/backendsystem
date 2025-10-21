@@ -24,14 +24,11 @@ const reportRoutes = require('./routes/reports');
 
 const app = express();
 
-// ✅ CORS Configuration
+// ✅ CORS Configuration - ONLY your live URLs
 const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'https://inventory-system-nine-xi.vercel.app',
-  'https://inventory-system.vercel.app',
-  'https://inventory-management-system.vercel.app',
-  'https://frontend-6setm7yw5-yumnas-projects-cde3c46c.vercel.app'
+  'http://localhost:3000',  // For local development
+  'http://localhost:5173',  // For local development
+  'https://inventory-system-nine-xi.vercel.app'  // YOUR LIVE FRONTEND
 ];
 
 app.use(cors({
