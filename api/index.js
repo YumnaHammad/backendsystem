@@ -38,6 +38,7 @@ app.use(cors({
       'https://inventory-system-nine-xi.vercel.app',
       'https://inventory-system-nine-xi.vercel.app/',
       'https://inventory-system-beta-smoky.vercel.app',
+      'https://backendsystem-one.vercel.app',
       'http://localhost:3001',
       'http://localhost:3002',
       'http://localhost:5173',
