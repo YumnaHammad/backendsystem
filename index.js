@@ -1,46 +1,18 @@
-// index.js
-// ✅ Main Express App for Backend System (Vercel + Local ready)
-
+// Simple Express App for Vercel - No Complex MongoDB Logic
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 require('dotenv').config();
 
-// Import routes
-const authRoutes = require('./routes/auth');
-const productRoutes = require('./routes/products');
-const purchaseRoutes = require('./routes/purchases');
-const invoiceRoutes = require('./routes/invoices');
-const receiptRoutes = require('./routes/receipts');
-const salesRoutes = require('./routes/sales');
-const returnRoutes = require('./routes/returns');
-const expectedReturnRoutes = require('./routes/expectedReturns');
-const stockRoutes = require('./routes/stock');
-const customerRoutes = require('./routes/customers');
-const userRoutes = require('./routes/users');
-const warehouseRoutes = require('./routes/warehouses');
-const supplierRoutes = require('./routes/suppliers');
-const reportRoutes = require('./routes/reports');
-
 const app = express();
 
-// ✅ CORS Configuration - ONLY your live URLs
-const allowedOrigins = [
-  'http://localhost:3000',  // For local development
-  'http://localhost:5173',  // For local development
-  'https://inventory-system-nine-xi.vercel.app'  // YOUR OLD LIVE FRONTEND
-];
-
+// ✅ Simple CORS Configuration
 app.use(cors({
-  origin: function (origin, callback) {
-    // allow requests with no origin (like mobile apps, curl)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    } else {
-      return callback(new Error('CORS not allowed for this origin'), false);
-    }
-  },
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'https://inventory-system-nine-xi.vercel.app'
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
@@ -56,7 +28,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// ✅ Health check (no DB required)
+// ✅ Health check (NO DATABASE REQUIRED)
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
@@ -65,84 +37,78 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// ✅ CORS test endpoint (no DB required)
+// ✅ CORS test endpoint (NO DATABASE REQUIRED)
 app.get('/api/cors-test', (req, res) => {
-  try {
-    res.json({ 
-      message: 'CORS is working!',
-      origin: req.headers.origin,
-      timestamp: new Date().toISOString(),
-      status: 'success'
-    });
-  } catch (error) {
-    console.error('CORS test error:', error);
-    res.status(500).json({ 
-      error: 'CORS test failed',
-      message: error.message 
-    });
-  }
+  res.json({ 
+    message: 'CORS is working!',
+    origin: req.headers.origin,
+    timestamp: new Date().toISOString(),
+    status: 'success'
+  });
 });
 
-// ✅ MongoDB connection function
-async function connectToMongoDB() {
+// ✅ Simple MongoDB connection (only when needed)
+async function connectDB() {
   try {
     if (mongoose.connection.readyState === 1) {
-      console.log('MongoDB already connected');
+      return; // Already connected
+    }
+    
+    const mongoUri = process.env.MONGODB_URI;
+    if (!mongoUri) {
+      console.log('No MongoDB URI provided, skipping database connection');
       return;
     }
-
-    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/inventory_system';
-    console.log('Connecting to MongoDB...');
     
-    // Set connection timeout to prevent hanging
     await mongoose.connect(mongoUri, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 5000, // 5 second timeout
-      connectTimeoutMS: 5000, // 5 second timeout
+      serverSelectionTimeoutMS: 10000,
     });
     
     console.log('MongoDB connected successfully');
   } catch (error) {
-    console.error('MongoDB connection error:', error);
+    console.log('MongoDB connection failed:', error.message);
     // Don't throw error, just log it
-    console.log('MongoDB connection failed, continuing without database...');
   }
 }
 
-// ✅ MongoDB connection middleware (connect before routes that need DB)
-app.use(async (req, res, next) => {
-  // Skip DB connection for health and CORS test endpoints
-  if (req.path === '/api/health' || req.path === '/api/cors-test') {
-    return next();
-  }
+// ✅ Connect to database (non-blocking)
+connectDB().catch(console.log);
 
-  try {
-    await connectToMongoDB();
-    next();
-  } catch (error) {
-    console.error('Database connection failed:', error);
-    // Don't block the request, just log the error and continue
-    console.log('Continuing without database connection...');
-    next();
-  }
-});
+// ✅ Import routes (only if they exist)
+try {
+  const authRoutes = require('./routes/auth');
+  const productRoutes = require('./routes/products');
+  const purchaseRoutes = require('./routes/purchases');
+  const invoiceRoutes = require('./routes/invoices');
+  const receiptRoutes = require('./routes/receipts');
+  const salesRoutes = require('./routes/sales');
+  const returnRoutes = require('./routes/returns');
+  const stockRoutes = require('./routes/stock');
+  const customerRoutes = require('./routes/customers');
+  const userRoutes = require('./routes/users');
+  const warehouseRoutes = require('./routes/warehouses');
+  const supplierRoutes = require('./routes/suppliers');
+  const reportRoutes = require('./routes/reports');
 
-// ✅ API Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/purchases', purchaseRoutes);
-app.use('/api/invoices', invoiceRoutes);
-app.use('/api/receipts', receiptRoutes);
-app.use('/api/sales', salesRoutes);
-app.use('/api/returns', returnRoutes);
-app.use('/api/expected-returns', expectedReturnRoutes);
-app.use('/api/stock', stockRoutes);
-app.use('/api/customers', customerRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/warehouses', warehouseRoutes);
-app.use('/api/suppliers', supplierRoutes);
-app.use('/api/reports', reportRoutes);
+  // ✅ API Routes
+  app.use('/api/auth', authRoutes);
+  app.use('/api/products', productRoutes);
+  app.use('/api/purchases', purchaseRoutes);
+  app.use('/api/invoices', invoiceRoutes);
+  app.use('/api/receipts', receiptRoutes);
+  app.use('/api/sales', salesRoutes);
+  app.use('/api/returns', returnRoutes);
+  app.use('/api/stock', stockRoutes);
+  app.use('/api/customers', customerRoutes);
+  app.use('/api/users', userRoutes);
+  app.use('/api/warehouses', warehouseRoutes);
+  app.use('/api/suppliers', supplierRoutes);
+  app.use('/api/reports', reportRoutes);
+} catch (error) {
+  console.log('Some routes failed to load:', error.message);
+}
 
 // ✅ 404 handler
 app.use('*', (req, res) => {
@@ -157,7 +123,7 @@ app.use((error, req, res, next) => {
   console.error('Server error:', error);
   res.status(500).json({ 
     error: 'Internal server error',
-    message: process.env.NODE_ENV === 'production' ? 'Something went wrong' : error.message
+    message: 'Something went wrong'
   });
 });
 
