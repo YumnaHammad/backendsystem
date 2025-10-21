@@ -18,55 +18,31 @@ const userRoutes = require('../routes/users');
 const warehouseRoutes = require('../routes/warehouses');
 const supplierRoutes = require('../routes/suppliers');
 const reportRoutes = require('../routes/reports');
-const cityReportRoutes = require('../routes/cityReports');
 
 const app = express();
 
-// Middleware - CORS Configuration
-app.use(cors({
-  origin: function (origin, callback) {
-    console.log('🌐 CORS Request from origin:', origin);
-    
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) {
-      console.log('✅ Allowing request with no origin');
-      return callback(null, true);
-    }
-    
-    // List of allowed origins
-    const allowedOrigins = [
-      'https://inventory-system-nine-xi.vercel.app',
-      'https://inventory-system-nine-xi.vercel.app/',
-      'https://inventory-system-beta-smoky.vercel.app',
-      'https://backendsystem-one.vercel.app',
-      'http://localhost:3001',
-      'http://localhost:3002',
-      'http://localhost:5173',
-      process.env.FRONTEND_URL
-    ].filter(Boolean);
-    
-    console.log('📋 Allowed origins:', allowedOrigins);
-    
-    // Check if origin is allowed
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      console.log('✅ Origin allowed:', origin);
-      callback(null, true);
-    } else {
-      console.log('⚠️  Origin not in allowed list:', origin);
-      console.log('🔓 Allowing anyway...');
-      callback(null, true); // Allow all for now
-    }
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+// CORS configuration
+const corsOptions = {
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'https://inventory-system-nine-xi.vercel.app',
+    'https://inventory-system.vercel.app',
+    'https://inventory-management-system.vercel.app',
+    'https://inventory-system-nine-xi.vercel.app'
+  ],
   credentials: true,
-  optionsSuccessStatus: 200 // For legacy browser support
-}));
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+};
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(cors(corsOptions));
 
-// Debug middleware - log all requests
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Request logging
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
@@ -74,7 +50,11 @@ app.use((req, res, next) => {
 
 // Health check (no DB required)
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    message: 'Backend is running successfully'
+  });
 });
 
 // CORS test endpoint (no DB required)
@@ -95,45 +75,49 @@ app.get('/api/cors-test', (req, res) => {
   }
 });
 
-// MongoDB connection middleware (connect before routes)
-app.use(async (req, res, next) => {
-  try {
-    await connectToMongoDB();
-    next();
-  } catch (error) {
-    console.error('MongoDB connection failed:', error);
-    res.status(500).json({ 
-      error: 'Database connection failed',
-      message: 'Please ensure MONGODB_URI is set in environment variables'
-    });
-  }
-});
-
-let isConnected = false;
+// MongoDB connection function
 async function connectToMongoDB() {
-  if (isConnected) return;
-  
-  const mongoURI = process.env.MONGODB_URI;
-  if (!mongoURI) {
-    throw new Error('MONGODB_URI environment variable is not set');
-  }
-  
   try {
-    await mongoose.connect(mongoURI, {
+    if (mongoose.connection.readyState === 1) {
+      console.log('MongoDB already connected');
+      return;
+    }
+
+    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/inventory_system';
+    console.log('Connecting to MongoDB...');
+    
+    await mongoose.connect(mongoUri, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
-    isConnected = true;
-    console.log('Connected to MongoDB successfully');
+    
+    console.log('MongoDB connected successfully');
   } catch (error) {
     console.error('MongoDB connection error:', error);
-    isConnected = false;
     throw error;
   }
 }
 
+// MongoDB connection middleware (connect before routes that need DB)
+app.use(async (req, res, next) => {
+  // Skip DB connection for health and CORS test endpoints
+  if (req.path === '/api/health' || req.path === '/api/cors-test') {
+    return next();
+  }
 
-// Routes
+  try {
+    await connectToMongoDB();
+    next();
+  } catch (error) {
+    console.error('Database connection failed:', error);
+    res.status(500).json({ 
+      error: 'Database connection failed',
+      message: 'Unable to connect to database. Please check your MongoDB connection.'
+    });
+  }
+});
+
+// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/purchases', purchaseRoutes);
@@ -147,32 +131,23 @@ app.use('/api/users', userRoutes);
 app.use('/api/warehouses', warehouseRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/reports', reportRoutes);
-app.use('/api/city-reports', cityReportRoutes);
-
-// Connect to MongoDB
-// mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/inventory_system', {
-//   useNewUrlParser: true,
-//   useUnifiedTopology: true,
-// }).then(() => {
-//   console.log('Connected to MongoDB');
-// }).catch(err => {
-//   console.error('MongoDB connection error:', err);
-// });
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
-});
 
 // 404 handler
 app.use('*', (req, res) => {
-  console.log(`404 - Route not found: ${req.method} ${req.originalUrl}`);
   res.status(404).json({ 
-    error: 'API route not found',
-    path: req.originalUrl,
-    method: req.method 
+    error: 'Route not found',
+    message: `The route ${req.originalUrl} does not exist.`
   });
 });
 
+// Error handler
+app.use((error, req, res, next) => {
+  console.error('Server error:', error);
+  res.status(500).json({ 
+    error: 'Internal server error',
+    message: process.env.NODE_ENV === 'production' ? 'Something went wrong' : error.message
+  });
+});
+
+// Export for Vercel
 module.exports = app;
