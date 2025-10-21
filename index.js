@@ -14,6 +14,7 @@ const invoiceRoutes = require('./routes/invoices');
 const receiptRoutes = require('./routes/receipts');
 const salesRoutes = require('./routes/sales');
 const returnRoutes = require('./routes/returns');
+const expectedReturnRoutes = require('./routes/expectedReturns');
 const stockRoutes = require('./routes/stock');
 const customerRoutes = require('./routes/customers');
 const userRoutes = require('./routes/users');
@@ -29,7 +30,8 @@ const allowedOrigins = [
   'http://localhost:5173',
   'https://inventory-system-nine-xi.vercel.app',
   'https://inventory-system.vercel.app',
-  'https://inventory-management-system.vercel.app'
+  'https://inventory-management-system.vercel.app',
+  'https://frontend-6setm7yw5-yumnas-projects-cde3c46c.vercel.app'
 ];
 
 app.use(cors({
@@ -71,7 +73,7 @@ app.get('/api/cors-test', (req, res) => {
   try {
     res.json({ 
       message: 'CORS is working!',
-      origin: req.headers.origin || 'Unknown',
+      origin: req.headers.origin,
       timestamp: new Date().toISOString(),
       status: 'success'
     });
@@ -107,9 +109,9 @@ async function connectToMongoDB() {
   }
 }
 
-// ✅ MongoDB connection middleware
+// ✅ MongoDB connection middleware (connect before routes that need DB)
 app.use(async (req, res, next) => {
-  // Skip DB connection for simple endpoints
+  // Skip DB connection for health and CORS test endpoints
   if (req.path === '/api/health' || req.path === '/api/cors-test') {
     return next();
   }
@@ -121,7 +123,7 @@ app.use(async (req, res, next) => {
     console.error('Database connection failed:', error);
     res.status(500).json({ 
       error: 'Database connection failed',
-      message: 'Unable to connect to MongoDB. Please check your connection.'
+      message: 'Unable to connect to database. Please check your MongoDB connection.'
     });
   }
 });
@@ -134,6 +136,7 @@ app.use('/api/invoices', invoiceRoutes);
 app.use('/api/receipts', receiptRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/returns', returnRoutes);
+app.use('/api/expected-returns', expectedReturnRoutes);
 app.use('/api/stock', stockRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/users', userRoutes);
