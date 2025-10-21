@@ -77,13 +77,22 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// CORS test endpoint
+// CORS test endpoint (no DB required)
 app.get('/api/cors-test', (req, res) => {
-  res.json({ 
-    message: 'CORS is working!',
-    origin: req.headers.origin,
-    timestamp: new Date().toISOString()
-  });
+  try {
+    res.json({ 
+      message: 'CORS is working!',
+      origin: req.headers.origin,
+      timestamp: new Date().toISOString(),
+      status: 'success'
+    });
+  } catch (error) {
+    console.error('CORS test error:', error);
+    res.status(500).json({ 
+      error: 'CORS test failed',
+      message: error.message 
+    });
+  }
 });
 
 // MongoDB connection middleware (connect before routes)
