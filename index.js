@@ -28,7 +28,7 @@ const app = express();
 const allowedOrigins = [
   'http://localhost:3000',  // For local development
   'http://localhost:5173',  // For local development
-  'https://inventory-system-nine-xi.vercel.app'  // YOUR LIVE FRONTEND
+  'https://inventory-system-nine-xi.vercel.app'  // YOUR OLD LIVE FRONTEND
 ];
 
 app.use(cors({
