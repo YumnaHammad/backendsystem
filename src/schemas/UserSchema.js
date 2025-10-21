@@ -108,6 +108,10 @@ const userSchema = new mongoose.Schema({
     canManageUsers: {
       type: Boolean,
       default: false
+    },
+    canAccessFinance: {
+      type: Boolean,
+      default: false
     }
   },
   lastLogin: {
@@ -256,7 +260,11 @@ userSchema.methods.canAccess = function(resource, action) {
     },
     'users': {
       'manage': 'canManageUsers',
-      'view': this.role === 'manager'
+      'view': this.role === 'manager' || this.role === 'admin'
+    },
+    'finance': {
+      'access': 'canAccessFinance',
+      'view': this.role === 'admin'
     }
   };
   
@@ -299,6 +307,9 @@ userSchema.methods.setDefaultPermissions = function() {
       this.permissions.canProcessPurchases = true;
       this.permissions.canProcessSales = true;
       this.permissions.canViewReports = true;
+      // Managers cannot manage users or access finance
+      this.permissions.canManageUsers = false;
+      this.permissions.canAccessFinance = false;
       break;
     case 'employee':
       this.permissions.canProcessPurchases = true;

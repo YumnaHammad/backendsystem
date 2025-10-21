@@ -4,7 +4,7 @@ const { createAuditLog } = require('../middleware/audit');
 // Create a new purchase
 const createPurchase = async (req, res) => {
   try {
-    const { supplierId, items, expectedDeliveryDate, notes, paymentMethod } = req.body;
+    const { supplierId, items, expectedDeliveryDate, notes, paymentMethod, paymentTerms, discountType, advancePayment, advancePaymentDate, taxAmount, discountAmount } = req.body;
 
     console.log('Creating purchase - Full request body:', JSON.stringify(req.body, null, 2));
 
@@ -136,6 +136,13 @@ const createPurchase = async (req, res) => {
       expectedDeliveryDate,
       notes,
       paymentMethod,
+      paymentTerms: paymentTerms || 'immediate',
+      discountType: discountType || 'fixed',
+      advancePayment: advancePayment || 0,
+      advancePaymentDate: advancePayment > 0 ? (advancePaymentDate || new Date()) : null,
+      taxAmount: taxAmount || 0,
+      discountAmount: discountAmount || 0,
+      paymentStatus: advancePayment > 0 ? 'partial' : 'pending',
       createdBy: req.user._id
     });
 
@@ -360,7 +367,22 @@ const generateReceipt = async (req, res) => {
       message: 'Payment marked as paid. Receipt generated successfully.',
       receipt,
       purchase,
-      note: 'Stock was already added when purchase order was created'
+      note: 'Stock was already added when purchase order was created',
+      receiptData: {
+        purchaseNumber: purchase.purchaseNumber,
+        receiptNumber: receipt.receiptNumber,
+        totalAmount: purchase.totalAmount,
+        advancePayment: purchase.advancePayment,
+        remainingPayment: purchase.remainingPayment,
+        paymentStatus: purchase.paymentStatus,
+        items: purchase.items,
+        supplier: purchase.supplierId,
+        purchaseDate: purchase.purchaseDate,
+        paymentMethod: purchase.paymentMethod,
+        taxAmount: purchase.taxAmount,
+        discountAmount: purchase.discountAmount,
+        notes: purchase.notes
+      }
     });
 
   } catch (error) {

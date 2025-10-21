@@ -563,6 +563,61 @@ const updateSalesOrderStatus = async (req, res) => {
       }
     }
     
+    // Handle CONFIRMED DELIVERED - Move from delivered to confirmed delivered
+    if (status === 'confirmed_delivered') {
+      console.log('Processing CONFIRMED DELIVERED - moving from delivered to confirmed delivered');
+      
+      const warehouses = await Warehouse.find({ isActive: true });
+      
+      for (const item of salesOrder.items) {
+        const itemProductId = (item.productId && item.productId._id)
+          ? item.productId._id.toString()
+          : item.productId.toString();
+        let quantityToConfirm = item.quantity;
+        
+        for (const warehouse of warehouses) {
+          if (quantityToConfirm <= 0) break;
+          
+          const stockItem = warehouse.currentStock.find(stock => 
+            stock.productId.toString() === itemProductId &&
+            (stock.variantId || null) === (item.variantId || null)
+          );
+          
+          if (stockItem && stockItem.deliveredQuantity > 0) {
+            const confirmQty = Math.min(stockItem.deliveredQuantity, quantityToConfirm);
+            
+            // Move from delivered to confirmed delivered
+            stockItem.deliveredQuantity -= confirmQty;
+            
+            // Add to confirmed delivered quantity
+            if (!stockItem.confirmedDeliveredQuantity) {
+              stockItem.confirmedDeliveredQuantity = 0;
+            }
+            stockItem.confirmedDeliveredQuantity += confirmQty;
+            
+            quantityToConfirm -= confirmQty;
+            
+            await warehouse.save();
+            
+            // Create stock movement record
+            const stockMovement = new StockMovement({
+              productId: item.productId,
+              warehouseId: warehouse._id,
+              movementType: 'confirmed_delivery',
+              quantity: confirmQty,
+              previousQuantity: stockItem.quantity,
+              newQuantity: stockItem.quantity,
+              referenceType: 'sales_order',
+              referenceId: salesOrder._id,
+              notes: `Confirmed delivered for sales order ${salesOrder.orderNumber}${item.variantName ? ' - ' + item.variantName : ''}`,
+              createdBy: req.user?._id || salesOrder.createdBy
+            });
+            await stockMovement.save();
+          }
+        }
+      }
+    }
+    
     // Handle CONFIRMED RETURN - DISABLED (use Expected Returns module instead)
     if (status === 'returned') {
       return res.status(400).json({ 
@@ -600,11 +655,14 @@ const updateSalesOrderStatus = async (req, res) => {
             ? `Return confirmed! Stock added to ${returnWarehouse ? returnWarehouse.name : 'warehouse'}`
             : status === 'delivered'
             ? 'Order delivered successfully! Reserved stock cleared (0) and stock removed from warehouse.'
+            : status === 'confirmed_delivered'
+            ? 'Order confirmed as delivered! Items moved to confirmed delivered column in warehouse.'
             : 'Sales order status updated successfully',
           salesOrder,
           stockRestored: status === 'returned',
           expectedReturn: status === 'expected_return',
           delivered: status === 'delivered',
+          confirmedDelivered: status === 'confirmed_delivered',
           reservedCleared: status === 'delivered' || status === 'dispatch' || status === 'dispatched',
           warehouseName: returnWarehouse ? returnWarehouse.name : null
     });

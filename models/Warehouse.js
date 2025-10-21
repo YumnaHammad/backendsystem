@@ -55,6 +55,11 @@ const warehouseSchema = new mongoose.Schema({
       default: 0,
       min: 0
     },
+    confirmedDeliveredQuantity: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
     tags: [{
       type: String,
       enum: ['returned', 'damaged', 'expired']

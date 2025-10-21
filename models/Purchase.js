@@ -65,9 +65,35 @@ const purchaseSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['cash', 'bank_transfer', 'check', 'credit_card']
+    enum: ['cash', 'bank_transfer', 'check', 'credit_card', 'debit_card', 'mobile_payment', 'online_transfer', 'letter_of_credit', 'bank_draft']
+  },
+  paymentTerms: {
+    type: String,
+    enum: ['immediate', 'net_7', 'net_15', 'net_30', 'net_45', 'net_60', 'on_delivery', 'partial', 'custom'],
+    default: 'immediate'
+  },
+  discountType: {
+    type: String,
+    enum: ['percentage', 'fixed'],
+    default: 'fixed'
   },
   paymentDate: {
+    type: Date
+  },
+  advancePayment: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  remainingPayment: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  advancePaymentDate: {
+    type: Date
+  },
+  remainingPaymentDate: {
     type: Date
   },
   receiptNumber: {
@@ -151,6 +177,11 @@ purchaseSchema.pre('save', async function(next) {
     // Calculate final amount
     if (this.totalAmount) {
       this.finalAmount = this.totalAmount + (this.taxAmount || 0) - (this.discountAmount || 0);
+    }
+    
+    // Calculate remaining payment
+    if (this.advancePayment && this.finalAmount) {
+      this.remainingPayment = this.finalAmount - this.advancePayment;
     }
     
   } catch (error) {

@@ -66,7 +66,7 @@ const salesOrderSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'confirmed', 'dispatch', 'dispatched', 'expected', 'delivered', 'expected_return', 'returned', 'cancelled'],
+    enum: ['pending', 'confirmed', 'dispatch', 'dispatched', 'expected', 'delivered', 'confirmed_delivered', 'expected_return', 'returned', 'cancelled'],
     default: 'pending'
   },
   paymentStatus: {
