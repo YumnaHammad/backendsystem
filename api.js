@@ -8,7 +8,10 @@ const app = express();
 
 // ✅ Simple CORS - Allow your frontend
 app.use(cors({
-  origin: 'https://inventory-system-nine-xi.vercel.app',
+  origin: [
+    'https://inventory-system-nine-xi.vercel.app',
+    'https://frontend-i0d99owat-yumnas-projects-cde3c46c.vercel.app'
+  ],
   credentials: true
 }));
 
