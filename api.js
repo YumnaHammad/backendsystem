@@ -10,7 +10,8 @@ const app = express();
 app.use(cors({
   origin: [
     'https://inventory-system-nine-xi.vercel.app',
-    'https://frontend-i0d99owat-yumnas-projects-cde3c46c.vercel.app'
+    'https://frontend-i0d99owat-yumnas-projects-cde3c46c.vercel.app',
+    'https://frontend-five-phi-v647mv7b5z.vercel.app'
   ],
   credentials: true
 }));
