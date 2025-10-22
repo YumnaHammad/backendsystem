@@ -9,6 +9,9 @@ const app = express();
 // ✅ Simple CORS - Allow your frontend
 app.use(cors({
   origin: [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:5173',
     'https://inventory-system-nine-xi.vercel.app',
     'https://frontend-i0d99owat-yumnas-projects-cde3c46c.vercel.app',
     'https://frontend-five-phi-v647mv7b5z.vercel.app'
