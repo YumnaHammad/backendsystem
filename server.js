@@ -27,20 +27,68 @@ const customerRoutes = require('./routes/customers');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// CORS - Simple configuration for Vercel
+// CORS - Smart configuration for both local and production
+const allowedOrigins = [
+  // Production (Vercel)
+  'https://inventory-system-amber-beta.vercel.app',
+  // Local development
+  'http://localhost:3000', 
+  'http://localhost:3001', 
+  'http://localhost:8080',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:3001',
+  'http://127.0.0.1:8080'
+];
+
 app.use(cors({
-  origin: [
-    'https://inventory-system-amber-beta.vercel.app',
-    'http://localhost:3000', 
-    'http://localhost:3001', 
-    'http://localhost:8080'
-  ],
+  origin: function (origin, callback) {
+    console.log('CORS request from origin:', origin);
+    
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) {
+      console.log('No origin - allowing request');
+      return callback(null, true);
+    }
+    
+    if (allowedOrigins.includes(origin)) {
+      console.log('Origin allowed:', origin);
+      return callback(null, true);
+    }
+    
+    // In development, allow any localhost origin
+    if (process.env.NODE_ENV !== 'production' && origin.includes('localhost')) {
+      console.log('Localhost origin allowed in development:', origin);
+      return callback(null, true);
+    }
+    
+    console.log('Origin blocked:', origin);
+    callback(new Error('Not allowed by CORS'));
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
-  credentials: true
+  credentials: true,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
 
 app.use(express.json());
+
+// Handle preflight requests
+app.options('*', cors());
+
+// Additional CORS middleware for Vercel
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
 
 // Use route files
 app.use('/api/auth', authRoutes);
@@ -103,26 +151,12 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server running' });
 });
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Error:', err);
-  res.status(500).json({ 
-    error: 'Internal Server Error',
-    message: err.message 
-  });
+// Start server
+app.listen(PORT, () => {
+  console.log(`🚀 Server running at http://localhost:${PORT}`);
+  console.log(`📊 API endpoints available at http://localhost:${PORT}/api`);
+  console.log(`🔧 Health check at http://localhost:${PORT}/api/health`);
 });
-
-// Start server only in local development
-if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, () => {
-    console.log(`🚀 Server running at http://localhost:${PORT}`);
-    console.log(`📊 API endpoints available at http://localhost:${PORT}/api`);
-    console.log(`🔧 Health check at http://localhost:${PORT}/api/health`);
-  });
-}
-
-// Export for Vercel
-module.exports = app;
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
