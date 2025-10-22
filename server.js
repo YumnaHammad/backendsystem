@@ -27,9 +27,35 @@ const customerRoutes = require('./routes/customers');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// CORS - Allow everything for local development
+// CORS - Smart configuration for both local and production
+const allowedOrigins = [
+  // Production (Vercel)
+  'https://inventory-system-amber-beta.vercel.app',
+  // Local development
+  'http://localhost:3000', 
+  'http://localhost:3001', 
+  'http://localhost:8080',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:3001',
+  'http://127.0.0.1:8080'
+];
+
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:8080', '*'],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // In development, allow any localhost origin
+    if (process.env.NODE_ENV !== 'production' && origin.includes('localhost')) {
+      return callback(null, true);
+    }
+    
+    callback(new Error('Not allowed by CORS'));
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
   credentials: true,
